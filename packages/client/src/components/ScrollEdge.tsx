@@ -1,5 +1,7 @@
 import { BaseEdge, getBezierPath, type EdgeProps } from '@xyflow/react';
 
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
 export function ScrollEdge({
   id,
   sourceX,
@@ -30,7 +32,7 @@ export function ScrollEdge({
         strokeWidth: 2.5,
         strokeLinecap: 'round',
         strokeLinejoin: 'round',
-        filter: 'url(#hand-drawn)',
+        filter: isSafari ? undefined : 'url(#hand-drawn)',
         transition: 'stroke 0.15s ease',
       }}
     />

@@ -1,5 +1,7 @@
 import { BaseEdge, getBezierPath, type EdgeProps } from '@xyflow/react';
 
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
 export function ApplyEdge({
   id,
   sourceX,
@@ -29,7 +31,7 @@ export function ApplyEdge({
         strokeLinecap: 'round',
         strokeDasharray: '6 4',
         opacity: 0.75,
-        filter: 'url(#hand-drawn)',
+        filter: isSafari ? undefined : 'url(#hand-drawn)',
         transition: 'stroke 0.15s ease',
       }}
     />

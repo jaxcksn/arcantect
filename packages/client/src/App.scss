@@ -416,7 +416,6 @@
     color: #1e1108;
     overflow-y: auto;
     overflow-x: hidden;
-    backdrop-filter: blur(2px);
   }
 
   &__summary {
@@ -1278,7 +1277,6 @@
   flex-direction: column;
   font-family: 'Grenze', 'Palatino Linotype', Palatino, serif;
   color: #1e1108;
-  backdrop-filter: blur(2px);
 
   &__header {
     padding: 14px 12px 10px;
@@ -1288,7 +1286,6 @@
     position: sticky;
     top: 0;
     z-index: 1;
-    backdrop-filter: blur(2px);
   }
 
   &__title {
