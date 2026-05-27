@@ -1,0 +1,22 @@
+{
+  "name": "@arcantect/scorer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test 'src/**/*.test.ts'",
+    "generate-schema": "node --experimental-strip-types src/generate-puzzle-schema.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "typescript": "~6.0.2"
+  },
+  "dependencies": {
+    "zod": "^4.4.3",
+    "@arcantect/datalog": "workspace:*"
+  }
+}

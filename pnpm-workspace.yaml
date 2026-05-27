@@ -1,0 +1,6 @@
+packages:
+  - packages/*
+allowBuilds:
+  esbuild: true
+overrides:
+  'sass': 'npm:sass-embedded@^1.100.0'
