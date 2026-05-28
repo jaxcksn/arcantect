@@ -9,10 +9,15 @@ export const ZONE_SEED_RULES: string = `
 publicZoneType("cdn"). publicZoneType("load_balancer"). publicZoneType("api_gateway").
 publicZoneType("waf"). publicZoneType("dns"). publicZoneType("internet").
 publicZoneType("certificate"). publicZoneType("payment_processor").
+publicZoneType("firewall"). publicZoneType("vpn"). publicZoneType("application").
 privateZoneType("cache"). privateZoneType("queue"). privateZoneType("private_network").
+privateZoneType("event_bus"). privateZoneType("streaming"). privateZoneType("monitoring").
+privateZoneType("log_aggregator"). privateZoneType("tracing"). privateZoneType("metrics"). privateZoneType("alerting").
 dataZoneType("database"). dataZoneType("object_storage"). dataZoneType("nosql_database").
-dataZoneType("secrets_manager").
-softDmzType("compute"). softDmzType("serverless"). softDmzType("auth").
+dataZoneType("secrets_manager"). dataZoneType("search"). dataZoneType("static_assets").
+softDmzType("compute"). softDmzType("serverless"). softDmzType("container"). softDmzType("kubernetes").
+softDmzType("auth"). softDmzType("orchestrator"). softDmzType("identity_provider").
+softDmzType("foundation_model"). softDmzType("ml_platform").
 `
 
 /**

@@ -11,12 +11,13 @@ import {
 } from '@xyflow/react';
 import { NodePanel } from '@components/NodePanel';
 import { ApplyEdge } from '@components/ApplyEdge';
+import { HostsEdge } from '@components/HostsEdge';
 import { ScrollEdge } from '@components/ScrollEdge';
 import { RuneNode } from '@nodes/RuneNode';
 import { useGameStore } from '@store';
 import { useCallback, useState } from 'react';
 
-const edgeTypes = { default: ScrollEdge, apply: ApplyEdge };
+const edgeTypes = { default: ScrollEdge, apply: ApplyEdge, hosts: HostsEdge };
 const nodeTypes = { rune: RuneNode };
 
 function ScrollFilters() {
@@ -138,7 +139,7 @@ function App() {
               className={`nav-panel__submit${allRequirementsMet ? ' nav-panel__submit--complete' : ''}`}
               onClick={submitPuzzle}
             >
-              <span>Seal the Tome</span>
+              <span>Consult the Council</span>
             </button>
           )}
         </Panel>
@@ -277,7 +278,6 @@ function App() {
                       )}
                     </>
                   )}
-
                 </>
               )}
             </div>

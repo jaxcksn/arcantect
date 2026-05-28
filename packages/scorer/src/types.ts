@@ -12,8 +12,9 @@ export type FlowType =
   | 'file-io'
   | 'internal-rpc'
   | 'dns-resolution'
+  | 'deployment'
 
-export type EdgeDirection = 'directed' | 'applies'
+export type EdgeDirection = 'directed' | 'applies' | 'hosts'
 
 export interface ScorerNode {
   id: string

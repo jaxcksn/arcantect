@@ -193,6 +193,72 @@
     inset 0 1px 4px rgba(255, 248, 200, 0.45);
 }
 
+/* ── Application variant — arcane purple tint for pre-placed service nodes ── */
+.rune-node--application {
+  background: #ede0f5;
+  border-color: #7a3db5;
+  box-shadow:
+    2px 2px 0 rgba(44, 26, 8, 0.2),
+    3px 5px 14px rgba(90, 45, 138, 0.15),
+    inset 0 1px 4px rgba(220, 200, 255, 0.4);
+
+  .rune-node__label {
+    color: #3d1a60;
+  }
+}
+
+.react-flow__node-rune:hover .rune-node--application {
+  border-color: #9b5ed4;
+  box-shadow:
+    2px 2px 0 rgba(44, 26, 8, 0.25),
+    3px 5px 18px rgba(90, 45, 138, 0.25),
+    0 0 0 1.5px #9b5ed4,
+    inset 0 1px 4px rgba(220, 200, 255, 0.4);
+}
+
+.react-flow__node-rune.selected .rune-node--application {
+  border-color: #9b5ed4;
+  box-shadow:
+    2px 2px 0 rgba(44, 26, 8, 0.25),
+    3px 5px 18px rgba(90, 45, 138, 0.25),
+    0 0 18px rgba(154, 94, 212, 0.4),
+    0 0 0 2px #9b5ed4,
+    inset 0 1px 4px rgba(220, 200, 255, 0.4);
+}
+
+/* ── Data variant — lighter parchment with dashed border for content artifacts ── */
+.rune-node--data {
+  background: #ecdba6;
+  border: 2px dashed #9c7a40;
+  box-shadow:
+    2px 2px 0 rgba(44, 26, 8, 0.12),
+    3px 5px 10px rgba(44, 26, 8, 0.1),
+    inset 0 1px 4px rgba(255, 252, 230, 0.6);
+
+  .rune-node__label {
+    color: #4a3820;
+  }
+}
+
+.react-flow__node-rune:hover .rune-node--data {
+  border-color: #c4921a;
+  box-shadow:
+    2px 2px 0 rgba(44, 26, 8, 0.2),
+    3px 5px 14px rgba(44, 26, 8, 0.18),
+    0 0 0 1.5px #c4921a,
+    inset 0 1px 4px rgba(255, 252, 230, 0.6);
+}
+
+.react-flow__node-rune.selected .rune-node--data {
+  border-color: #c4921a;
+  box-shadow:
+    2px 2px 0 rgba(44, 26, 8, 0.2),
+    3px 5px 14px rgba(44, 26, 8, 0.18),
+    0 0 18px rgba(196, 146, 26, 0.35),
+    0 0 0 2px #c4921a,
+    inset 0 1px 4px rgba(255, 252, 230, 0.6);
+}
+
 /* ── Handles — hidden by default, revealed on node hover ── */
 .react-flow__handle {
   width: 10px !important;

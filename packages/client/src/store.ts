@@ -10,7 +10,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { scoreGraph } from '@arcantect/scorer';
 import type { Puzzle } from '@model/Puzzle';
-import type { ArcEdge, ApplyEdge, DirectedEdge, GameState } from '@model/GameState';
+import type { ArcEdge, ApplyEdge, DirectedEdge, HostsEdge, GameState } from '@model/GameState';
 import { NODE_REGISTRY } from '@nodes/registry';
 import { PUZZLES } from '@puzzles';
 
@@ -33,6 +33,13 @@ export const applyEdgeDefaults = {
   },
 } satisfies Pick<ApplyEdge, 'type' | 'data'>;
 
+export const hostsEdgeDefaults = {
+  type: 'hosts',
+  data: {
+    direction: 'hosts' as const,
+  },
+} satisfies Pick<HostsEdge, 'type' | 'data'>;
+
 function ensureEdgeDefaults(edge: Edge): ArcEdge {
   if (edge.data?.direction === 'applies') {
     return {
@@ -40,6 +47,13 @@ function ensureEdgeDefaults(edge: Edge): ArcEdge {
       type: 'apply',
       data: { direction: 'applies' },
     } as ApplyEdge;
+  }
+  if (edge.data?.direction === 'hosts') {
+    return {
+      ...edge,
+      type: 'hosts',
+      data: { direction: 'hosts' },
+    } as HostsEdge;
   }
   return {
     ...directedEdgeDefaults,
@@ -226,9 +240,9 @@ export const useGameStore = create<GameState>()(
         const nodeType = sourceNode?.data?.nodeType as string | undefined;
         const def = nodeType ? NODE_REGISTRY[nodeType] : undefined;
         const defaults =
-          def?.defaultEdgeType === 'applies'
-            ? applyEdgeDefaults
-            : directedEdgeDefaults;
+          def?.defaultEdgeType === 'applies' ? applyEdgeDefaults :
+          def?.defaultEdgeType === 'hosts'   ? hostsEdgeDefaults :
+          directedEdgeDefaults;
 
         state.edges = addEdge(
           { ...connection, ...defaults },

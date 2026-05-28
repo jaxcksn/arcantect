@@ -2,15 +2,23 @@ import { Handle, Position } from '@xyflow/react';
 import type { Node, NodeProps } from '@xyflow/react';
 import { NODE_REGISTRY } from './registry';
 
-export type RuneData = { nodeType: string };
+export type RuneData = { nodeType: string; label?: string };
 type RuneNodeType = Node<RuneData, 'rune'>;
+
+const VARIANT_ICON_COLOR: Record<string, string> = {
+  application: '#5a2d8a',
+  data: '#6a5030',
+};
 
 export function RuneNode({ data, isConnectable }: NodeProps<RuneNodeType>) {
   const def = NODE_REGISTRY[data.nodeType];
   const Icon = def?.Icon;
+  const variant = def?.variant;
+  const iconColor = variant ? (VARIANT_ICON_COLOR[variant] ?? '#3d2008') : '#3d2008';
+  const className = ['rune-node', variant ? `rune-node--${variant}` : ''].filter(Boolean).join(' ');
 
   return (
-    <div className='rune-node'>
+    <div className={className}>
       <Handle
         id='top'
         type='source'
@@ -37,9 +45,9 @@ export function RuneNode({ data, isConnectable }: NodeProps<RuneNodeType>) {
       />
 
       <div className='rune-node__icon'>
-        {Icon && <Icon color='#3d2008' strokeWidth={1} />}
+        {Icon && <Icon color={iconColor} strokeWidth={1} />}
       </div>
-      <div className='rune-node__label'>{def?.label ?? data.nodeType}</div>
+      <div className='rune-node__label'>{data.label ?? def?.label ?? data.nodeType}</div>
     </div>
   );
 }

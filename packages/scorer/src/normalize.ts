@@ -5,16 +5,16 @@ import type { RawEdge, RawNode, ScorerEdge, ScorerNode, FlowType } from './types
 // Ordered from most specific to least so inference rules are unambiguous.
 // ---------------------------------------------------------------------------
 
-export const PUBLIC_TYPES = new Set(['cdn', 'load_balancer', 'api_gateway', 'waf', 'dns', 'internet', 'certificate', 'payment_processor'])
-export const DMZ_TYPES = new Set(['compute', 'serverless', 'auth'])
-export const PRIVATE_TYPES = new Set(['cache', 'queue', 'private_network'])
-export const DATA_TYPES = new Set(['database', 'object_storage', 'nosql_database', 'secrets_manager'])
+export const PUBLIC_TYPES = new Set(['cdn', 'load_balancer', 'api_gateway', 'waf', 'dns', 'internet', 'certificate', 'payment_processor', 'firewall', 'vpn', 'application'])
+export const DMZ_TYPES = new Set(['compute', 'serverless', 'auth', 'orchestrator', 'identity_provider', 'foundation_model', 'ml_platform', 'container', 'kubernetes'])
+export const PRIVATE_TYPES = new Set(['cache', 'queue', 'private_network', 'event_bus', 'streaming', 'monitoring', 'log_aggregator', 'tracing', 'metrics', 'alerting'])
+export const DATA_TYPES = new Set(['database', 'object_storage', 'nosql_database', 'secrets_manager', 'search', 'static_assets'])
 
 export const INGRESS_TYPES = new Set(['cdn', 'load_balancer', 'api_gateway', 'internet'])
 export const AUTH_TYPES = new Set(['api_gateway', 'waf', 'auth'])
-export const DATABASE_TYPES = new Set(['database', 'nosql_database'])
+export const DATABASE_TYPES = new Set(['database', 'nosql_database', 'search'])
 export const STORAGE_TYPES = new Set(['object_storage'])
-export const QUEUE_TYPES = new Set(['queue'])
+export const QUEUE_TYPES = new Set(['queue', 'event_bus', 'streaming'])
 export const DNS_TYPES = new Set(['dns'])
 export const CACHE_TYPES = new Set(['cache'])
 
@@ -69,17 +69,19 @@ export function normalizeEdges(
     const targetType = nodeMap.get(edge.target)?.runeType ?? ''
     const configEncrypted = edge.data?.['encrypted']
 
-    const direction = edge.data?.direction === 'applies' ? 'applies' : 'directed'
+    const direction =
+      edge.data?.direction === 'applies' ? 'applies' :
+      edge.data?.direction === 'hosts'   ? 'hosts'   : 'directed'
+
+    const isHosts = direction === 'hosts'
 
     return {
       id: edge.id,
       source: edge.source,
       target: edge.target,
       direction,
-      flowType: inferFlowType(sourceType, targetType),
-      // Explicit config flag wins; otherwise infer from source rune type.
-      encrypted: configEncrypted === true ? true : inferEncrypted(sourceType),
-      // Filled in after zone inference runs.
+      flowType: isHosts ? 'deployment' : inferFlowType(sourceType, targetType),
+      encrypted: isHosts ? false : (configEncrypted === true ? true : inferEncrypted(sourceType)),
       crossesZone: false,
     }
   })

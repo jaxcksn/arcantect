@@ -15,7 +15,7 @@ function compilePuzzle(json: PuzzleJson): Puzzle {
       id: n.id,
       type: 'rune',
       position: n.position,
-      data: { nodeType: n.nodeType },
+      data: { nodeType: n.nodeType, ...(n.label ? { label: n.label } : {}) },
       deletable: n.deletable,
     })),
   };

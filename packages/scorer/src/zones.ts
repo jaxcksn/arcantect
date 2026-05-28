@@ -35,19 +35,37 @@ const HARD_SEED_MAP: ReadonlyMap<string, Zone> = new Map([
   ['internet', 'public'],
   ['certificate', 'public'],
   ['payment_processor', 'public'],
+  ['firewall', 'public'],
+  ['vpn', 'public'],
+  ['application', 'public'],
   ['cache', 'private'],
   ['queue', 'private'],
   ['private_network', 'private'],
+  ['event_bus', 'private'],
+  ['streaming', 'private'],
+  ['monitoring', 'private'],
+  ['log_aggregator', 'private'],
+  ['tracing', 'private'],
+  ['metrics', 'private'],
+  ['alerting', 'private'],
   ['database', 'data'],
   ['object_storage', 'data'],
   ['nosql_database', 'data'],
   ['secrets_manager', 'data'],
+  ['search', 'data'],
+  ['static_assets', 'data'],
 ])
 
 const SOFT_SEED_MAP: ReadonlyMap<string, Zone> = new Map([
   ['compute', 'dmz'],
   ['serverless', 'dmz'],
+  ['container', 'dmz'],
+  ['kubernetes', 'dmz'],
   ['auth', 'dmz'],
+  ['orchestrator', 'dmz'],
+  ['identity_provider', 'dmz'],
+  ['foundation_model', 'dmz'],
+  ['ml_platform', 'dmz'],
 ])
 
 // ---------------------------------------------------------------------------
@@ -76,10 +94,12 @@ export function inferZones(nodes: ScorerNode[], edges: readonly ScorerEdge[]): v
 
   // Phase 2 — BFS propagation, iterating until stable.
   // Hard-seeded nodes are immutable; soft-seeded nodes can be pushed inward.
+  // Hosts edges are structural (deployment), not zone-crossing flows — skip them.
   let changed = true
   while (changed) {
     changed = false
     for (const edge of edges) {
+      if (edge.direction === 'hosts') continue
       const source = nodeMap.get(edge.source)
       const target = nodeMap.get(edge.target)
       if (!source?.zone || !target) continue
@@ -106,6 +126,7 @@ export function annotateEdgeCrossings(
 ): void {
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
   for (const edge of edges) {
+    if (edge.direction === 'hosts') { edge.crossesZone = false; continue }
     const sourceZone = nodeMap.get(edge.source)?.zone
     const targetZone = nodeMap.get(edge.target)?.zone
     edge.crossesZone = sourceZone !== undefined && targetZone !== undefined && sourceZone !== targetZone

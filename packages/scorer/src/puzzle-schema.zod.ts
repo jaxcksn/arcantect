@@ -69,6 +69,7 @@ export type RubricJson = z.infer<typeof RubricJsonSchema>;
 export const InitialNodeJsonSchema = z.object({
   id: z.string(),
   nodeType: z.string(),
+  label: z.string().optional(),
   position: z.object({ x: z.number(), y: z.number() }),
   deletable: z.boolean().optional(),
 });

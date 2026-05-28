@@ -14,6 +14,12 @@ const spaPuzzle: PuzzleJson = {
       position: { x: -320, y: 160 },
       deletable: false,
     },
+    {
+      id: 'preplaced-static-assets',
+      nodeType: 'static_assets',
+      position: { x: -320, y: -20 },
+      deletable: false,
+    },
   ],
   rubric: {
     requirements: [
@@ -28,6 +34,12 @@ const spaPuzzle: PuzzleJson = {
         label:
           "The signboard is made of objects, we don't need a living servant to hand out scrolls.",
         hint: "Object Storage stores static assets, ideal for things that don't change often.",
+      },
+      {
+        id: 'assets-in-storage',
+        label:
+          'The painted notices must be kept in the storehouse, not scattered across the road.',
+        hint: 'Connect the Static Assets to Object Storage — that is where the SPA files live.',
       },
       {
         id: 'cdn-fronts-storage',
@@ -78,6 +90,7 @@ const spaPuzzle: PuzzleJson = {
       hasDnsToCdn("yes")          :- node(R, "dns"), node(C, "cdn"), reaches(R, C).
       hasCertForCdn("yes")        :- node(A, "certificate"), node(C, "cdn"), associated(A, C).
       hasWafForCdn("yes")         :- node(W, "waf"), node(C, "cdn"), associated(W, C).
+      hasAssetsInStorage("yes")   :- node(A, "static_assets"), node(S, "object_storage"), edge(A, S).
 
       // Storage is publicly exposed if internet can reach it without going through any CDN.
       directPublicStorage(S) :-
@@ -89,6 +102,9 @@ const spaPuzzle: PuzzleJson = {
 
       req("needs-object-storage",  "pass") :- node(_, "object_storage").
       req("needs-object-storage",  "fail") :- !node(_, "object_storage").
+
+      req("assets-in-storage",     "pass") :- hasAssetsInStorage("yes").
+      req("assets-in-storage",     "fail") :- !hasAssetsInStorage("yes").
 
       req("cdn-fronts-storage",    "pass") :- hasCdnFrontsStorage("yes").
       req("cdn-fronts-storage",    "fail") :- !hasCdnFrontsStorage("yes").
@@ -109,7 +125,7 @@ const spaPuzzle: PuzzleJson = {
         edgeMeta(E, "crossesZone", "true"),
         !edgeMeta(E, "encrypted", "true").
     `,
-    optimization: { maxNodes: 6, maxEdges: 6 },
+    optimization: { maxNodes: 7, maxEdges: 7 },
   },
 };
 

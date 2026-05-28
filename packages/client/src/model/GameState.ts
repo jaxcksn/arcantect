@@ -17,9 +17,14 @@ type ApplyEdgeData = {
   direction: 'applies';
 };
 
+type HostsEdgeData = {
+  direction: 'hosts';
+};
+
 export type DirectedEdge = Edge<DirectedEdgeData>;
 export type ApplyEdge = Edge<ApplyEdgeData>;
-export type ArcEdge = DirectedEdge | ApplyEdge;
+export type HostsEdge = Edge<HostsEdgeData>;
+export type ArcEdge = DirectedEdge | ApplyEdge | HostsEdge;
 
 export type View = 'home' | 'playing' | 'results';
 

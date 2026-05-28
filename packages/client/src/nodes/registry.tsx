@@ -1,21 +1,40 @@
 import {
+  IconActivity,
   IconApi,
+  IconBell,
+  IconBroadcast,
+  IconGauge,
+  IconLogs,
+  IconTimeline,
   IconBucket,
   IconCertificate,
   IconCloudNetwork,
   IconCreditCard,
   IconDatabase,
+  IconDatabaseSearch,
+  IconDatabaseStar,
   IconFingerprint,
+  IconIdBadge2,
   IconKey,
+  IconBrain,
+  IconCpu,
+  IconLockAccess,
   IconScale,
   IconServer,
   IconLambda,
   IconShieldCheck,
+  IconSitemap,
   IconStack,
   IconTopologyFull,
+  IconWall,
+  IconWaveSine,
   IconWorld,
   IconAlignBoxCenterMiddle,
   IconLicense,
+  IconAppWindow,
+  IconFiles,
+  IconContainer,
+  IconHexagon,
 } from '@tabler/icons-react';
 
 export type NodeDef = {
@@ -24,7 +43,9 @@ export type NodeDef = {
   category: Category;
   Icon: React.ComponentType<{ color?: string; strokeWidth?: number }>;
   /** When set, dragging an edge from this node defaults to this edge type. */
-  defaultEdgeType?: 'applies';
+  defaultEdgeType?: 'applies' | 'hosts';
+  /** Controls alternate visual rendering for pre-placed context nodes. */
+  variant?: 'application' | 'data';
 };
 
 export const CATEGORIES = [
@@ -34,6 +55,7 @@ export const CATEGORIES = [
   'Network',
   'Security',
   'Messaging',
+  'Observability',
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
 
@@ -43,6 +65,21 @@ export const NODE_REGISTRY: Record<string, NodeDef> = {
     label: 'Internet',
     category: 'Input',
     Icon: IconWorld,
+  },
+  application: {
+    id: 'application',
+    label: 'Application',
+    category: 'Input',
+    Icon: IconAppWindow,
+    variant: 'application',
+    defaultEdgeType: 'hosts',
+  },
+  static_assets: {
+    id: 'static_assets',
+    label: 'Static Assets',
+    category: 'Input',
+    Icon: IconFiles,
+    variant: 'data',
   },
   compute: {
     id: 'compute',
@@ -127,5 +164,110 @@ export const NODE_REGISTRY: Record<string, NodeDef> = {
     label: 'Payment Processor',
     category: 'Input',
     Icon: IconCreditCard,
+  },
+  nosql_database: {
+    id: 'nosql_database',
+    label: 'NoSQL Database',
+    category: 'Storage',
+    Icon: IconDatabaseStar,
+  },
+  search: {
+    id: 'search',
+    label: 'Search',
+    category: 'Storage',
+    Icon: IconDatabaseSearch,
+  },
+  streaming: {
+    id: 'streaming',
+    label: 'Data Stream',
+    category: 'Messaging',
+    Icon: IconWaveSine,
+  },
+  event_bus: {
+    id: 'event_bus',
+    label: 'Event Bus',
+    category: 'Messaging',
+    Icon: IconBroadcast,
+  },
+  vpn: {
+    id: 'vpn',
+    label: 'VPN',
+    category: 'Network',
+    Icon: IconLockAccess,
+  },
+  firewall: {
+    id: 'firewall',
+    label: 'Firewall',
+    category: 'Security',
+    Icon: IconWall,
+    defaultEdgeType: 'applies',
+  },
+  identity_provider: {
+    id: 'identity_provider',
+    label: 'Identity Provider',
+    category: 'Security',
+    Icon: IconIdBadge2,
+    defaultEdgeType: 'applies',
+  },
+  monitoring: {
+    id: 'monitoring',
+    label: 'Monitoring',
+    category: 'Observability',
+    Icon: IconActivity,
+    defaultEdgeType: 'applies',
+  },
+  log_aggregator: {
+    id: 'log_aggregator',
+    label: 'Log Aggregator',
+    category: 'Observability',
+    Icon: IconLogs,
+  },
+  tracing: {
+    id: 'tracing',
+    label: 'Distributed Tracing',
+    category: 'Observability',
+    Icon: IconTimeline,
+  },
+  metrics: {
+    id: 'metrics',
+    label: 'Metrics Store',
+    category: 'Observability',
+    Icon: IconGauge,
+  },
+  alerting: {
+    id: 'alerting',
+    label: 'Alerting',
+    category: 'Observability',
+    Icon: IconBell,
+  },
+  container: {
+    id: 'container',
+    label: 'Container',
+    category: 'Compute',
+    Icon: IconContainer,
+  },
+  kubernetes: {
+    id: 'kubernetes',
+    label: 'Kubernetes',
+    category: 'Compute',
+    Icon: IconHexagon,
+  },
+  orchestrator: {
+    id: 'orchestrator',
+    label: 'Orchestrator',
+    category: 'Compute',
+    Icon: IconSitemap,
+  },
+  foundation_model: {
+    id: 'foundation_model',
+    label: 'Foundation Model',
+    category: 'Compute',
+    Icon: IconBrain,
+  },
+  ml_platform: {
+    id: 'ml_platform',
+    label: 'ML Platform',
+    category: 'Compute',
+    Icon: IconCpu,
   },
 };

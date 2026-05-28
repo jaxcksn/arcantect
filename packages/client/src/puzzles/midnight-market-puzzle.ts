@@ -5,152 +5,259 @@ const midnightMarketPuzzle: PuzzleJson = {
   title: 'The Great Midnight Market',
   shortDescription: 'Model e-commerce order processing under high load.',
   prompt:
-    "The House of Silks and Sundries begs your aid before the great Midnight Market. When the black moon rises, fifty thousand shoppers may rush the shopfront at once, all clawing through racks of cloaks, boots, rings, and enchanted scarves. They must be able to browse the wares, place treasures into their baskets, and pay with royal coin-seals before the best goods vanish. But the merchant guild has strict demands. No purchase decree may ever be lost, even if the scribes in the counting house faint, the delivery ravens fall behind, or some lesser spell in the back room fails. No cloak, ring, or pair of boots may be sold to two villagers at once. If only three dragonhide jackets remain, then only three buyers may claim them. The shoppers' coin-seals are dangerous secrets, and the guild forbids us from letting ordinary shop goblins handle them carelessly. Their payment magic must be guarded according to the laws of the Royal Treasury. And above all, the shopfront itself must not collapse merely because the counting house is slow. Shoppers should still be able to browse, fill baskets, and place orders, even if the order scribes are buried under a mountain of scrolls. What spellwork would you weave so the Midnight Market survives the rush?",
+    "Before the black moon crests the Obsidian Tower, the House of Silks and Sundries must be ready. Fifty thousand shoppers will descend at the stroke of midnight — clawing through racks of cloaks, dragonhide jackets, enchanted scarves, and silver rings — and every one of them expects the shelves to answer instantly.,,Two rivers of demand will run at once: the great browsing flood, as thousands scan the wares, and the sharper rush of purchase, where a shopper slaps down coin-seals for the last jacket. These rivers must not drown each other. Even when every scribe in the counting house is buried beneath a mountain of purchase scrolls, the shelves should still answer browsers. And those purchase scrolls must never be lost — not if a scribe faints, not if a raven falls, not if the candles blow out.,,Every dragonhide jacket is a singular treasure. If only three remain, exactly three buyers may claim them — not four, not five. The counting house must reckon each claim in ink that cannot be erased or written twice, and the ledger must endure. Should one ledger catch fire, another must be standing by.,,The coin-seals of the realm are jealously guarded secrets. The guild of Royal Treasury forbids ordinary shop servants from touching payment magic. The spells that speak to the Royal Mint must be kept behind separate wards, in a vault no common hand may open, and only the appointed payment scribe may hold the keys.,,What enchantment would you weave to raise the Midnight Market so it may survive both the flood of curious eyes and the fever of midnight spending?",
   context: { tags: ['hard', 'high-throughput'] },
   initialNodes: [
     {
       id: 'preplaced-internet',
       nodeType: 'internet',
-      position: { x: -320, y: 200 },
+      position: { x: -420, y: 160 },
       deletable: false,
     },
     {
       id: 'preplaced-payment-processor',
       nodeType: 'payment_processor',
-      position: { x: 560, y: 400 },
+      position: { x: 640, y: 380 },
+      deletable: false,
+    },
+    {
+      id: 'preplaced-catalog-service',
+      nodeType: 'application',
+      label: 'Catalog Service',
+      position: { x: -120, y: -140 },
+      deletable: false,
+    },
+    {
+      id: 'preplaced-order-service',
+      nodeType: 'application',
+      label: 'Order Service',
+      position: { x: 160, y: -140 },
+      deletable: false,
+    },
+    {
+      id: 'preplaced-payment-service',
+      nodeType: 'application',
+      label: 'Payment Service',
+      position: { x: 440, y: -140 },
       deletable: false,
     },
   ],
   rubric: {
     requirements: [
       {
-        id: 'waf-filters-traffic',
-        label:
-          'Fifty thousand shoppers may rush the shopfront at once, and the gate needs protection.',
-        hint: 'Apply a WAF to the API Gateway so public requests are filtered there.',
+        id: 'api-gateway-public',
+        label: 'The shopfront must have a public gate that all may enter.',
+        hint: 'Add an API Gateway and route internet traffic to it, optionally through DNS first.',
       },
       {
-        id: 'api-gateway-behind-waf',
-        label:
-          'Shoppers must be able to browse, fill baskets, and place orders through a public shopfront.',
-        hint: 'Route shoppers to an API Gateway directly, or through DNS first.',
+        id: 'waf-guards-gateway',
+        label: 'A protective ward must filter the mob before it reaches the gate.',
+        hint: 'Apply a WAF to the API Gateway to filter malicious traffic at the boundary.',
       },
       {
-        id: 'load-balancer-in-path',
-        label:
-          'The shopfront must not collapse when the Midnight Market crowd arrives.',
-        hint: 'A Load Balancer distributes requests across the application workers.',
+        id: 'lb-distributes-load',
+        label: 'The midnight mob must be spread across many workers, lest any one scribe collapse.',
+        hint: 'Place a Load Balancer between the API Gateway and your compute workers.',
       },
       {
-        id: 'compute-serves-requests',
-        label:
-          'Something needs to handle browsing, baskets, and order requests for shoppers.',
-        hint: 'Put compute or serverless workers behind the Load Balancer.',
+        id: 'catalog-on-compute',
+        label: 'The Catalog Service cannot cast its spell in mid-air — it must be bound to a servant.',
+        hint: 'Connect the Catalog Service to a Server or Serverless Function.',
       },
       {
-        id: 'cache-for-reads',
-        label:
-          'The same racks of cloaks, boots, rings, and scarves will be browsed far more often than the purchase ledger is updated.',
-        hint: 'Use a Cache for catalogue reads so browsing traffic does not hammer the database.',
+        id: 'order-intake-on-compute',
+        label: 'The Order Service must run on its own computing servant.',
+        hint: 'Connect the Order Service to a Server or Serverless Function.',
       },
       {
-        id: 'auth-layer-present',
-        label:
-          'Only real shoppers should be trusted to place treasures into baskets and pay.',
-        hint: 'Add an Auth Service before requests touch protected data stores.',
+        id: 'cache-shields-catalog',
+        label: 'Fifty thousand browsers should not each demand a fresh reading from the great ledger.',
+        hint: "Connect the Catalog Service's compute to a Cache so product reads are served from memory.",
       },
       {
-        id: 'queue-decouples-orders',
-        label:
-          'No purchase decree may ever be lost, even if the counting house falls behind.',
-        hint: 'Place orders on a Message Queue so order intake is durable and asynchronous.',
+        id: 'auth-guards-api',
+        label: 'Only verified shoppers should touch their baskets and place orders.',
+        hint: 'Add an Auth Service to verify identity before requests reach protected resources.',
       },
       {
-        id: 'order-processor-reads-queue',
-        label:
-          'The counting house still needs to process each purchase decree after it is accepted.',
-        hint: 'Use compute or serverless workers to consume orders from the Message Queue.',
+        id: 'orders-queued-for-durability',
+        label: 'No purchase decree must be lost, even if every scribe in the counting house falls ill.',
+        hint: 'Have the Order Service write incoming orders to a Queue, Event Bus, or Data Stream.',
       },
       {
-        id: 'database-with-replica',
-        label: 'If we lose a ledger, another one shall be available!',
-        hint: 'Use replicated databases by adding a second Database node.',
+        id: 'order-processor-consumes-queue',
+        label: 'Every decree on the scroll must be picked up and fulfilled by a working scribe.',
+        hint: 'Connect compute or serverless workers to consume orders from the Queue.',
       },
       {
-        id: 'payment-gateway-integrated',
-        label:
-          'Shoppers must be able to pay with royal coin-seals before the best goods vanish.',
-        hint: 'The order processor should send payment work to the external Payment Processor.',
+        id: 'relational-db-for-inventory',
+        label: 'If three dragonhide jackets remain, exactly three may be sold — never four.',
+        hint: 'Use a Relational Database whose ACID transactions prevent inventory oversell.',
       },
       {
-        id: 'payment-keys-in-secrets',
-        label:
-          "Shoppers' coin-seals are dangerous secrets and must be guarded under Royal Treasury rules.",
-        hint: 'Store Payment Processor credentials in a Secrets Manager and let the order processor read them.',
+        id: 'database-replicated-for-ha',
+        label: 'Should one great ledger catch fire, another must stand ready to take its place.',
+        hint: 'Add a second Relational Database node to serve as a standby replica.',
+      },
+      {
+        id: 'payment-service-isolated',
+        label: 'The payment scribe must work behind separate wards, apart from the shopfront and counting house.',
+        hint: 'Host the Payment Service on dedicated compute that does not also host the Catalog or Order Service.',
+      },
+      {
+        id: 'payment-credentials-in-secrets',
+        label: 'The keys to the Royal Mint must be kept in a sealed vault, never left in the open.',
+        hint: 'Store payment credentials in a Secrets Manager and give only the Payment Service compute access to it.',
+      },
+      {
+        id: 'payment-processor-reachable',
+        label: 'The payment scribe must be able to reach the Royal Mint to collect the coin-seals.',
+        hint: "Connect the Payment Service's compute to the external Payment Processor.",
+      },
+      {
+        id: 'cdn-reduces-origin-load',
+        label: 'Let distant copies of the wares reach browsing hands without taxing the central storehouse. (Bonus)',
+        hint: 'Add a CDN reachable from the internet to serve cached copies of catalog content.',
+        bonus: true,
+      },
+      {
+        id: 'observability-present',
+        label: 'The Guild must be able to watch the Market\'s health when the midnight rush arrives. (Bonus)',
+        hint: 'Add Monitoring, Metrics, or Alerting to keep watch over the live system.',
+        bonus: true,
       },
     ],
     datalogRules: `
       reaches(X, Y) :- edge(X, Y).
       reaches(X, Z) :- edge(X, Y), reaches(Y, Z).
 
-      hasWafOnApi("yes")         :- node(W, "waf"),           node(A, "api_gateway"),   edgeById(E, W, A), edgeMeta(E, "direction", "applies").
-      hasInternetToApi("yes")    :- node(I, "internet"),      node(A, "api_gateway"),   edge(I, A).
-      hasInternetToApi("yes")    :- node(I, "internet"),      node(D, "dns"),           node(A, "api_gateway"), edge(I, D), edge(D, A).
-      hasApiToLb("yes")          :- node(A, "api_gateway"),   node(L, "load_balancer"), edge(A, L).
-      hasLbToCompute("yes")      :- node(L, "load_balancer"), node(C, "compute"),       edge(L, C).
-      hasLbToCompute("yes")      :- node(L, "load_balancer"), node(C, "serverless"),    edge(L, C).
-      hasComputeToCache("yes")   :- node(C, "compute"),       node(K, "cache"),         edge(C, K).
-      hasComputeToCache("yes")   :- node(C, "serverless"),    node(K, "cache"),         edge(C, K).
-      hasComputeToQueue("yes")   :- node(C, "compute"),       node(Q, "queue"),         edge(C, Q).
-      hasComputeToQueue("yes")   :- node(C, "serverless"),    node(Q, "queue"),         edge(C, Q).
-      hasQueueToCompute("yes")   :- node(Q, "queue"),         node(C, "compute"),       edge(Q, C).
-      hasQueueToCompute("yes")   :- node(Q, "queue"),         node(C, "serverless"),    edge(Q, C).
-      hasComputeToPayment("yes") :- node(C, "compute"),       node(P, "payment_processor"), edge(C, P).
-      hasComputeToPayment("yes") :- node(C, "serverless"),    node(P, "payment_processor"), edge(C, P).
-      hasComputeToSecrets("yes") :- node(C, "compute"),       node(S, "secrets_manager"),   edge(C, S).
-      hasComputeToSecrets("yes") :- node(C, "serverless"),    node(S, "secrets_manager"),   edge(C, S).
-      hasTwoDatabases("yes")     :- node(D1, "database"),     node(D2, "database"),     D1 != D2.
+      // ── Compute type helper ─────────────────────────────────────────────────
+      // Any node that can execute application code — server, function, container, or cluster.
+      isCompute(C) :- node(C, "compute").
+      isCompute(C) :- node(C, "serverless").
+      isCompute(C) :- node(C, "container").
+      isCompute(C) :- node(C, "kubernetes").
 
-      req("waf-filters-traffic",       "pass") :- hasWafOnApi("yes").
-      req("waf-filters-traffic",       "fail") :- !hasWafOnApi("yes").
+      // ── Hosting helpers ─────────────────────────────────────────────────────
+      // Which compute node each pre-placed service runs on.
+      // container = single standalone container workload (like an ECS task)
+      // kubernetes = a cluster platform that can host many services as separate pods;
+      //              multiple application nodes may point to the same kubernetes node.
+      catalogHostedOn(C) :- isCompute(C), edge("preplaced-catalog-service", C).
+      orderHostedOn(C)   :- isCompute(C), edge("preplaced-order-service", C).
+      paymentHostedOn(C) :- isCompute(C), edge("preplaced-payment-service", C).
 
-      req("api-gateway-behind-waf",    "pass") :- hasInternetToApi("yes").
-      req("api-gateway-behind-waf",    "fail") :- !hasInternetToApi("yes").
+      // ── Public ingress ──────────────────────────────────────────────────────
+      hasInternetToApi("yes") :- node(I, "internet"), node(A, "api_gateway"), edge(I, A).
+      hasInternetToApi("yes") :- node(I, "internet"), node(D, "dns"), node(A, "api_gateway"), edge(I, D), edge(D, A).
 
-      req("load-balancer-in-path",     "pass") :- hasApiToLb("yes").
-      req("load-balancer-in-path",     "fail") :- !hasApiToLb("yes").
+      hasWafOnApi("yes") :- node(W, "waf"), node(A, "api_gateway"), edgeById(E, W, A), edgeMeta(E, "direction", "applies").
 
-      req("compute-serves-requests",   "pass") :- hasLbToCompute("yes").
-      req("compute-serves-requests",   "fail") :- !hasLbToCompute("yes").
+      hasApiToLb("yes")     :- node(A, "api_gateway"),   node(L, "load_balancer"), edge(A, L).
+      hasLbToCompute("yes") :- node(L, "load_balancer"), isCompute(C),             edge(L, C).
+      hasLbPath("yes")      :- hasApiToLb("yes"), hasLbToCompute("yes").
 
-      req("cache-for-reads",           "pass") :- node(_, "cache"), hasComputeToCache("yes").
-      req("cache-for-reads",           "fail") :- !node(_, "cache").
-      req("cache-for-reads",           "fail") :- node(_, "cache"), !hasComputeToCache("yes").
+      // ── Read path ───────────────────────────────────────────────────────────
+      hasCacheForCatalog("yes") :- catalogHostedOn(Comp), node(K, "cache"), edge(Comp, K).
 
-      req("auth-layer-present",        "pass") :- node(_, "auth").
-      req("auth-layer-present",        "fail") :- !node(_, "auth").
+      // ── Auth ────────────────────────────────────────────────────────────────
+      hasAuth("yes") :- node(_, "auth").
 
-      req("queue-decouples-orders",    "pass") :- node(_, "queue"), hasComputeToQueue("yes").
-      req("queue-decouples-orders",    "fail") :- !node(_, "queue").
-      req("queue-decouples-orders",    "fail") :- node(_, "queue"), !hasComputeToQueue("yes").
+      // ── Order durability: intake → queue ────────────────────────────────────
+      // Accepts Queue, Event Bus, or Data Stream.
+      orderWritesToQueue("yes") :- orderHostedOn(C), node(Q, "queue"),     edge(C, Q).
+      orderWritesToQueue("yes") :- orderHostedOn(C), node(Q, "event_bus"), edge(C, Q).
+      orderWritesToQueue("yes") :- orderHostedOn(C), node(Q, "streaming"), edge(C, Q).
 
-      req("order-processor-reads-queue", "pass") :- hasQueueToCompute("yes").
-      req("order-processor-reads-queue", "fail") :- !hasQueueToCompute("yes").
+      // ── Order processor: queue → compute ────────────────────────────────────
+      queueHasProcessor("yes") :- node(Q, "queue"),     isCompute(C), edge(Q, C).
+      queueHasProcessor("yes") :- node(Q, "event_bus"), isCompute(C), edge(Q, C).
+      queueHasProcessor("yes") :- node(Q, "streaming"), isCompute(C), edge(Q, C).
 
-      req("database-with-replica",     "pass") :- hasTwoDatabases("yes").
-      req("database-with-replica",     "fail") :- !hasTwoDatabases("yes").
+      // ── Data stores ─────────────────────────────────────────────────────────
+      hasRelationalDb("yes") :- node(_, "database").
+      hasTwoDatabases("yes") :- node(D1, "database"), node(D2, "database"), D1 != D2.
 
-      req("payment-gateway-integrated","pass") :- hasComputeToPayment("yes").
-      req("payment-gateway-integrated","fail") :- !hasComputeToPayment("yes").
+      // ── Payment isolation ───────────────────────────────────────────────────
+      // Payment is isolated when its host node ID differs from every catalog and order host.
+      // Two services on the same kubernetes cluster share a node ID → not isolated.
+      paymentSharesCompute("yes") :- paymentHostedOn(C), catalogHostedOn(C).
+      paymentSharesCompute("yes") :- paymentHostedOn(C), orderHostedOn(C).
+      paymentIsolated("yes")      :- paymentHostedOn(_), !paymentSharesCompute("yes").
 
-      req("payment-keys-in-secrets",   "pass") :- node(_, "secrets_manager"), hasComputeToSecrets("yes").
-      req("payment-keys-in-secrets",   "fail") :- !node(_, "secrets_manager").
-      req("payment-keys-in-secrets",   "fail") :- node(_, "secrets_manager"), !hasComputeToSecrets("yes").
+      paymentToSecrets("yes")   :- paymentHostedOn(C), node(S, "secrets_manager"), edge(C, S).
+      paymentToProcessor("yes") :- paymentHostedOn(C), node(P, "payment_processor"), edge(C, P).
 
-      violation("db-public-exposure",  N) :- node(N, "database"), zone(N, "public").
-      violation("single-az-database",  N) :- node(N, "database"), !nodeConfig(N, "multiAz", "true"), !hasTwoDatabases("yes").
+      // ── Bonus ───────────────────────────────────────────────────────────────
+      // CDN must be reachable from internet AND have at least one downstream origin it serves.
+      hasCdn("yes") :- node(I, "internet"), node(C, "cdn"), reaches(I, C), edge(C, O).
+
+      // Observability must be wired to at least one compute node.
+      // Accepts both pull/applies (monitoring → compute) and push (compute → monitoring).
+      hasObservability("yes") :- node(M, "monitoring"), isCompute(C), edge(M, C).
+      hasObservability("yes") :- node(M, "monitoring"), isCompute(C), edge(C, M).
+      hasObservability("yes") :- node(M, "alerting"),   isCompute(C), edge(M, C).
+      hasObservability("yes") :- node(M, "alerting"),   isCompute(C), edge(C, M).
+      hasObservability("yes") :- node(M, "metrics"),    isCompute(C), edge(M, C).
+      hasObservability("yes") :- node(M, "metrics"),    isCompute(C), edge(C, M).
+
+      // ── Requirements ────────────────────────────────────────────────────────
+      req("api-gateway-public",           "pass") :- hasInternetToApi("yes").
+      req("api-gateway-public",           "fail") :- !hasInternetToApi("yes").
+
+      req("waf-guards-gateway",           "pass") :- hasWafOnApi("yes").
+      req("waf-guards-gateway",           "fail") :- !hasWafOnApi("yes").
+
+      req("lb-distributes-load",          "pass") :- hasLbPath("yes").
+      req("lb-distributes-load",          "fail") :- !hasLbPath("yes").
+
+      req("catalog-on-compute",           "pass") :- catalogHostedOn(_).
+      req("catalog-on-compute",           "fail") :- !catalogHostedOn(_).
+
+      req("order-intake-on-compute",      "pass") :- orderHostedOn(_).
+      req("order-intake-on-compute",      "fail") :- !orderHostedOn(_).
+
+      req("cache-shields-catalog",        "pass") :- hasCacheForCatalog("yes").
+      req("cache-shields-catalog",        "fail") :- !hasCacheForCatalog("yes").
+
+      req("auth-guards-api",              "pass") :- hasAuth("yes").
+      req("auth-guards-api",              "fail") :- !hasAuth("yes").
+
+      req("orders-queued-for-durability", "pass") :- orderWritesToQueue("yes").
+      req("orders-queued-for-durability", "fail") :- !orderWritesToQueue("yes").
+
+      req("order-processor-consumes-queue", "pass") :- queueHasProcessor("yes").
+      req("order-processor-consumes-queue", "fail") :- !queueHasProcessor("yes").
+
+      req("relational-db-for-inventory",  "pass") :- hasRelationalDb("yes").
+      req("relational-db-for-inventory",  "fail") :- !hasRelationalDb("yes").
+
+      req("database-replicated-for-ha",   "pass") :- hasTwoDatabases("yes").
+      req("database-replicated-for-ha",   "fail") :- !hasTwoDatabases("yes").
+
+      req("payment-service-isolated",     "pass") :- paymentIsolated("yes").
+      req("payment-service-isolated",     "fail") :- !paymentIsolated("yes").
+
+      req("payment-credentials-in-secrets", "pass") :- paymentToSecrets("yes").
+      req("payment-credentials-in-secrets", "fail") :- !paymentToSecrets("yes").
+
+      req("payment-processor-reachable",  "pass") :- paymentToProcessor("yes").
+      req("payment-processor-reachable",  "fail") :- !paymentToProcessor("yes").
+
+      req("cdn-reduces-origin-load",      "pass") :- hasCdn("yes").
+      req("cdn-reduces-origin-load",      "fail") :- !hasCdn("yes").
+
+      req("observability-present",        "pass") :- hasObservability("yes").
+      req("observability-present",        "fail") :- !hasObservability("yes").
+
+      // ── Violations ──────────────────────────────────────────────────────────
+      violation("db-public-exposure",     N) :- node(N, "database"),  zone(N, "public").
+      violation("payment-service-public", N) :- paymentHostedOn(N),   zone(N, "public").
+      violation("queue-public-exposure",  N) :- node(N, "queue"),     zone(N, "public").
+      violation("queue-public-exposure",  N) :- node(N, "event_bus"), zone(N, "public").
+      violation("queue-public-exposure",  N) :- node(N, "streaming"), zone(N, "public").
     `,
-    optimization: { maxNodes: 14, maxEdges: 12 },
+    optimization: { maxNodes: 18, maxEdges: 16 },
   },
 };
 
