@@ -12,6 +12,9 @@
     "./components/badge": "./src/components/badge.tsx",
     "./components/progress": "./src/components/progress.tsx"
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
     "class-variance-authority": "^0.7.1",
