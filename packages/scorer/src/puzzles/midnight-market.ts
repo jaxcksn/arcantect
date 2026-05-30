@@ -1,5 +1,5 @@
 import type { AnnotatedGraph, Rubric } from '../types.ts';
-import { antiPatterns } from '../antipatterns.ts';
+import { restrictions } from '../restrictions.ts';
 import { canReach } from '../graph.ts';
 
 function nodeIdsByType(g: AnnotatedGraph, ...runeTypes: string[]): Set<string> {
@@ -30,7 +30,7 @@ function nodeIdsByType(g: AnnotatedGraph, ...runeTypes: string[]): Set<string> {
  *                                             Secrets Manager (payment keys)
  */
 export const midnightMarketRubric: Rubric = {
-  requirements: [
+  hardConstraints: [
     {
       id: 'waf-filters-traffic',
       label: 'A Ward must stand at the gate where the multitudes arrive.',
@@ -87,12 +87,13 @@ export const midnightMarketRubric: Rubric = {
       hint: "Coin-seal secrets are dangerous — guard the Payment Processor's keys in a Secrets Manager.",
     },
   ],
-  antiPatterns: [
-    antiPatterns.noAuthBeforeData,
-    antiPatterns.dbPublicExposure,
-    antiPatterns.singleAzDatabase,
+  restrictions: [
+    restrictions.noAuthBeforeData,
+    restrictions.singleAzDatabase,
     {
       id: 'naive-payment-path',
+      label: 'Payment processing must be decoupled through a queue.',
+      hint: 'The Payment Processor should only be reachable after passing through a Message Queue.',
       detect: (g: AnnotatedGraph) => {
         const ingressIds = nodeIdsByType(g, 'internet', 'cdn', 'load_balancer', 'api_gateway');
         const paymentIds = nodeIdsByType(g, 'payment_processor');
@@ -103,7 +104,7 @@ export const midnightMarketRubric: Rubric = {
         if (canReach(ingressIds, paymentIds, g.edges, queueIds)) {
           return [
             {
-              antipattern: 'naive-payment-path',
+              restriction: 'naive-payment-path',
               message:
                 'Your Payment Processor is reachable from compute without passing through a Message Queue — purchase orders must be decoupled asynchronously.',
             },

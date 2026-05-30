@@ -1,4 +1,4 @@
-import type { AntiPattern, AnnotatedGraph, Violation } from './types.ts';
+import type { Restriction, AnnotatedGraph, Violation } from './types.ts';
 import {
   DATA_TYPES,
   INGRESS_TYPES,
@@ -8,33 +8,13 @@ import {
 } from './normalize.ts';
 import { canReach, hasDirectEdge } from './graph.ts';
 
-type Detector = AntiPattern['detect'];
-
-// ---------------------------------------------------------------------------
-// db-public-exposure
-// A data-store node ended up in the public zone — directly reachable from
-// the internet with no network boundary in front of it.
-// ---------------------------------------------------------------------------
-
-const dbPublicExposure: Detector = graph => {
-  const exposed = graph.nodes.filter(
-    n => DATA_TYPES.has(n.runeType) && n.zone === 'public',
-  );
-  return exposed.map(n => ({
-    antipattern: 'db-public-exposure',
-    message: `${n.label || n.runeType} is in the public zone — data stores must never be internet-accessible.`,
-    nodeIds: [n.id],
-  }));
-};
+type Detector = Restriction['detect'];
 
 // ---------------------------------------------------------------------------
 // no-auth-before-data
-// There exists a directed path from an ingress node to a data store that
-// passes through no authentication node.  Detected by removing auth nodes
-// from the graph and checking reachability from ingress to data.
 // ---------------------------------------------------------------------------
 
-const noAuthBeforeData: Detector = graph => {
+const noAuthBeforeDataDetect: Detector = graph => {
   const ingressIds = new Set(
     graph.nodes.filter(n => INGRESS_TYPES.has(n.runeType)).map(n => n.id),
   );
@@ -49,8 +29,6 @@ const noAuthBeforeData: Detector = graph => {
 
   if (ingressIds.size === 0 || dataIds.size === 0) return [];
 
-  // BFS from ingress, skipping auth nodes — if a data node is reachable,
-  // there is a path that bypasses authentication.
   const reachableWithoutAuth = canReach(
     ingressIds,
     dataIds,
@@ -62,7 +40,7 @@ const noAuthBeforeData: Detector = graph => {
 
   return [
     {
-      antipattern: 'no-auth-before-data',
+      restriction: 'no-auth-before-data',
       message:
         'A path exists from your ingress to a data store without passing through an authentication layer.',
     },
@@ -71,17 +49,14 @@ const noAuthBeforeData: Detector = graph => {
 
 // ---------------------------------------------------------------------------
 // single-az-database
-// A database-type node has neither a same-type sibling (replica) nor
-// multiAz: true in its config.  Flagged once per isolated database type.
 // ---------------------------------------------------------------------------
 
-const singleAzDatabase: Detector = graph => {
+const singleAzDatabaseDetect: Detector = graph => {
   const dbNodes = graph.nodes.filter(n => DATABASE_TYPES.has(n.runeType));
   if (dbNodes.length === 0) return [];
 
   const violations: Violation[] = [];
 
-  // Group by runeType — two database nodes are considered replicas of each other.
   const byType = new Map<string, typeof dbNodes>();
   for (const n of dbNodes) {
     const group = byType.get(n.runeType) ?? [];
@@ -96,7 +71,7 @@ const singleAzDatabase: Detector = graph => {
     if (!hasReplica && !hasMultiAz) {
       const node = group[0]!;
       violations.push({
-        antipattern: 'single-az-database',
+        restriction: 'single-az-database',
         message: `${node.label || node.runeType} has no replica or Multi-AZ config — a single instance is a reliability risk.`,
         nodeIds: group.map(n => n.id),
       });
@@ -107,32 +82,16 @@ const singleAzDatabase: Detector = graph => {
 };
 
 // ---------------------------------------------------------------------------
-// unencrypted-cross-zone
-// An edge that crosses zone boundaries carries unencrypted traffic.
-// ---------------------------------------------------------------------------
-
-const unencryptedCrossZone: Detector = graph => {
-  const bad = graph.edges.filter(e => e.crossesZone && !e.encrypted);
-  return bad.map(e => ({
-    antipattern: 'unencrypted-cross-zone',
-    message: 'An edge crosses a security zone boundary without encryption.',
-    edgeIds: [e.id],
-  }));
-};
-
-// ---------------------------------------------------------------------------
 // synchronous-everything
-// The puzzle is tagged `high-throughput` but contains no message queue —
-// every call must be synchronous, creating a bottleneck.
 // ---------------------------------------------------------------------------
 
-const synchronousEverything: Detector = graph => {
+const synchronousEverythingDetect: Detector = graph => {
   if (!graph.puzzle.tags.includes('high-throughput')) return [];
   const hasQueue = graph.nodes.some(n => QUEUE_TYPES.has(n.runeType));
   if (hasQueue) return [];
   return [
     {
-      antipattern: 'synchronous-everything',
+      restriction: 'synchronous-everything',
       message:
         'High-throughput workloads need async decoupling — add a message queue to avoid synchronous bottlenecks.',
     },
@@ -141,11 +100,9 @@ const synchronousEverything: Detector = graph => {
 
 // ---------------------------------------------------------------------------
 // cdn-to-database
-// A CDN node has a direct edge to a database node.  CDNs should only talk
-// to origin servers, never directly to data stores.
 // ---------------------------------------------------------------------------
 
-const cdnToDatabase: Detector = graph => {
+const cdnToDatabaseDetect: Detector = graph => {
   const cdnIds = new Set(
     graph.nodes.filter(n => n.runeType === 'cdn').map(n => n.id),
   );
@@ -157,7 +114,7 @@ const cdnToDatabase: Detector = graph => {
 
   return [
     {
-      antipattern: 'cdn-to-database',
+      restriction: 'cdn-to-database',
       message:
         'CDN is directly connected to a data store — CDNs should route to origin servers, not databases.',
     },
@@ -165,49 +122,46 @@ const cdnToDatabase: Detector = graph => {
 };
 
 // ---------------------------------------------------------------------------
-// Reusable checks. Puzzles opt into these from their rubric instead of the
-// scorer applying every anti-pattern globally.
+// Built-in restrictions — opt-in per puzzle rubric.
 // ---------------------------------------------------------------------------
 
-export const antiPatterns = {
-  dbPublicExposure: {
-    id: 'db-public-exposure',
-    detect: dbPublicExposure,
-  },
+export const restrictions = {
   noAuthBeforeData: {
     id: 'no-auth-before-data',
-    detect: noAuthBeforeData,
+    label: 'All paths to data stores must pass through authentication.',
+    hint: 'Add an Auth Service between your ingress and any database.',
+    detect: noAuthBeforeDataDetect,
   },
   singleAzDatabase: {
     id: 'single-az-database',
-    detect: singleAzDatabase,
-  },
-  unencryptedCrossZone: {
-    id: 'unencrypted-cross-zone',
-    detect: unencryptedCrossZone,
+    label: 'Databases must be replicated or configured for multi-AZ.',
+    hint: 'Add a replica database node or enable multiAz in the database config.',
+    detect: singleAzDatabaseDetect,
   },
   synchronousEverything: {
     id: 'synchronous-everything',
-    detect: synchronousEverything,
+    label: 'High-throughput systems must use asynchronous decoupling.',
+    hint: 'Add a message queue to handle traffic spikes without blocking synchronous calls.',
+    detect: synchronousEverythingDetect,
   },
   cdnToDatabase: {
     id: 'cdn-to-database',
-    detect: cdnToDatabase,
+    label: 'CDNs must not connect directly to databases.',
+    hint: 'Route CDN traffic to an origin server — never directly to a data store.',
+    detect: cdnToDatabaseDetect,
   },
-} satisfies Record<string, AntiPattern>;
+} satisfies Record<string, Restriction>;
 
-export const ANTI_PATTERN_DETECTORS: readonly AntiPattern[] = [
-  antiPatterns.dbPublicExposure,
-  antiPatterns.noAuthBeforeData,
-  antiPatterns.singleAzDatabase,
-  antiPatterns.unencryptedCrossZone,
-  antiPatterns.synchronousEverything,
-  antiPatterns.cdnToDatabase,
+export const RESTRICTION_DETECTORS: readonly Restriction[] = [
+  restrictions.noAuthBeforeData,
+  restrictions.singleAzDatabase,
+  restrictions.synchronousEverything,
+  restrictions.cdnToDatabase,
 ];
 
-export function detectAntiPatterns(
+export function detectRestrictions(
   graph: AnnotatedGraph,
-  selectedAntiPatterns: readonly AntiPattern[] = ANTI_PATTERN_DETECTORS,
+  selectedRestrictions: readonly Restriction[] = RESTRICTION_DETECTORS,
 ): Violation[] {
-  return selectedAntiPatterns.flatMap(antiPattern => antiPattern.detect(graph));
+  return selectedRestrictions.flatMap(r => r.detect(graph));
 }

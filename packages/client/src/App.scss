@@ -1018,6 +1018,8 @@
 
 /* ── Results screen ── */
 .results-screen {
+  position: relative;
+  overflow: hidden;
   min-height: 100vh;
   background-color: #f5e6c4;
   background-image:
@@ -1032,6 +1034,8 @@
   animation: fadeIn 0.4s ease both;
 
   &__card {
+    position: relative;
+    z-index: 1;
     width: 100%;
     max-width: 580px;
     background: rgba(236, 219, 166, 0.97);
@@ -1313,6 +1317,104 @@
         background: rgba(61, 32, 8, 0.07);
         border-color: #3d2008;
       }
+    }
+  }
+
+  /* ── Star rating ── */
+  &__stars {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-bottom: 6px;
+  }
+
+  &__star {
+    font-size: 26px;
+    line-height: 1;
+
+    &--filled {
+      color: #c4921a;
+    }
+
+    &--empty {
+      color: rgba(61, 32, 8, 0.2);
+    }
+  }
+
+  /* ── Tradeoff profile radar ── */
+  &__tradeoff-radar {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    width: 100%;
+    padding-bottom: 4px;
+  }
+
+  &__tradeoff-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 36px;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  &__tradeoff-label {
+    text-align: right;
+    color: #5d3514;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__tradeoff-weight {
+    color: #7a5230;
+    font-size: 10px;
+  }
+
+  &__tradeoff-track {
+    position: relative;
+    height: 10px;
+    background: rgba(61, 32, 8, 0.07);
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid rgba(61, 32, 8, 0.12);
+  }
+
+  &__tradeoff-zero {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(61, 32, 8, 0.25);
+  }
+
+  &__tradeoff-bar {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    border-radius: 2px;
+
+    &--positive {
+      background: #1a6130;
+    }
+
+    &--negative {
+      background: #8b1a1a;
+    }
+  }
+
+  &__tradeoff-value {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+
+    &--positive {
+      color: #1a6130;
+    }
+
+    &--negative {
+      color: #8b1a1a;
     }
   }
 }

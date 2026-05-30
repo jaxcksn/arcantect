@@ -39,3 +39,21 @@ export function requirementResults(
   const allIds = new Set([...passSet, ...failSet]);
   return [...allIds].map(id => ({ id, passed: passSet.has(id) && !failSet.has(id) }));
 }
+
+/** All capability goal results derived as capgoal(id, "pass") or capgoal(id, "fail"). */
+export function capgoalResults(
+  result: EvalResult,
+): Array<{ id: string; passed: boolean }> {
+  const passSet = new Set<string>();
+  const failSet = new Set<string>();
+
+  for (const tuple of result.query("capgoal")) {
+    const [id, outcome] = tuple;
+    if (id === undefined) continue;
+    if (outcome === "pass") passSet.add(id);
+    else if (outcome === "fail") failSet.add(id);
+  }
+
+  const allIds = new Set([...passSet, ...failSet]);
+  return [...allIds].map(id => ({ id, passed: passSet.has(id) && !failSet.has(id) }));
+}

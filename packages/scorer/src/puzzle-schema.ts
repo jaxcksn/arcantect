@@ -4,8 +4,9 @@
  */
 export type {
   InlineDetect,
-  AntiPatternJson,
+  RestrictionJson,
   RequirementJson,
+  CapabilityGoalJson,
   OptimizationJson,
   RubricJson,
   InitialNodeJson,

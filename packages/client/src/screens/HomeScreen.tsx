@@ -1,6 +1,7 @@
 import { useGameStore } from '@store';
 import { PUZZLES } from '@puzzles';
 import type { Puzzle } from '@model/Puzzle';
+import ArcaneBackground from '@components/ArcaneBackground';
 
 function tagModifier(tag: string): string {
   return tag.toLowerCase().replace(/[^a-z0-9]/g, '-');
@@ -44,6 +45,7 @@ function PuzzleCard({ puzzle }: { puzzle: Puzzle }) {
 export function HomeScreen() {
   return (
     <div className='home-screen'>
+      <ArcaneBackground />
       <div className='home-screen__hero'>
         <div className='home-screen__ornament'>✦ ✦ ✦</div>
         <h1 className='home-screen__title'>Arcantect</h1>

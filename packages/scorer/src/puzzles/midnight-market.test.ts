@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { midnightMarketRubric } from './midnight-market.ts';
-import type { AnnotatedGraph, ScorerNode, ScorerEdge } from '../types.ts';
+import type { AnnotatedGraph, ScorerEdge, ScorerNode } from '../types.ts';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -9,8 +9,8 @@ import type { AnnotatedGraph, ScorerNode, ScorerEdge } from '../types.ts';
 
 let _edgeCounter = 0;
 
-function node(id: string, runeType: string, zone?: ScorerNode['zone']): ScorerNode {
-  return { id, runeType, label: runeType, config: {}, zone };
+function node(id: string, runeType: string): ScorerNode {
+  return { id, runeType, label: runeType, config: {}, capabilities: [] };
 }
 
 function edge(source: string, target: string): ScorerEdge {
@@ -21,7 +21,6 @@ function edge(source: string, target: string): ScorerEdge {
     direction: 'directed',
     flowType: 'internal-rpc',
     encrypted: false,
-    crossesZone: false,
   };
 }
 
@@ -29,18 +28,18 @@ function graph(nodes: ScorerNode[], edges: ScorerEdge[]): AnnotatedGraph {
   return { nodes, edges, puzzle: { tags: [] } };
 }
 
-function antiById(id: string) {
-  const ap = midnightMarketRubric.antiPatterns?.find(a => a.id === id);
-  if (!ap) throw new Error(`Anti-pattern "${id}" not found`);
-  return ap.detect;
+function restrictionById(id: string) {
+  const r = midnightMarketRubric.restrictions?.find(r => r.id === id);
+  if (!r) throw new Error(`Restriction "${id}" not found`);
+  return r.detect;
 }
 
 // ---------------------------------------------------------------------------
-// Anti-patterns
+// Restrictions
 // ---------------------------------------------------------------------------
 
-describe('anti-pattern: naive-payment-path', () => {
-  const detect = antiById('naive-payment-path');
+describe('restriction: naive-payment-path', () => {
+  const detect = restrictionById('naive-payment-path');
 
   it('triggers when ingress reaches payment_processor without going through queue', () => {
     const g = graph(
@@ -49,7 +48,7 @@ describe('anti-pattern: naive-payment-path', () => {
     );
     const violations = detect(g);
     assert.equal(violations.length, 1);
-    assert.equal(violations[0]!.antipattern, 'naive-payment-path');
+    assert.equal(violations[0]!.restriction, 'naive-payment-path');
   });
 
   it('does not trigger when the only path from ingress to payment_processor goes through the queue', () => {
@@ -83,8 +82,8 @@ describe('anti-pattern: naive-payment-path', () => {
   });
 });
 
-describe('anti-pattern: no-auth-before-data (via noAuthBeforeData)', () => {
-  const detect = antiById('no-auth-before-data');
+describe('restriction: no-auth-before-data (via noAuthBeforeData)', () => {
+  const detect = restrictionById('no-auth-before-data');
 
   it('triggers when ingress can reach a data store without auth', () => {
     const g = graph(
@@ -93,7 +92,7 @@ describe('anti-pattern: no-auth-before-data (via noAuthBeforeData)', () => {
     );
     const violations = detect(g);
     assert.equal(violations.length, 1);
-    assert.equal(violations[0]!.antipattern, 'no-auth-before-data');
+    assert.equal(violations[0]!.restriction, 'no-auth-before-data');
   });
 
   it('does not trigger when api_gateway (which is itself an auth type) is on the path', () => {
@@ -118,35 +117,14 @@ describe('anti-pattern: no-auth-before-data (via noAuthBeforeData)', () => {
   });
 });
 
-describe('anti-pattern: db-public-exposure (via dbPublicExposure)', () => {
-  const detect = antiById('db-public-exposure');
-
-  it('triggers when a database node is in the public zone', () => {
-    const g = graph([node('db', 'database', 'public')], []);
-    const violations = detect(g);
-    assert.equal(violations.length, 1);
-    assert.equal(violations[0]!.antipattern, 'db-public-exposure');
-  });
-
-  it('does not trigger when the database node is in the private zone', () => {
-    const g = graph([node('db', 'database', 'private')], []);
-    assert.equal(detect(g).length, 0);
-  });
-
-  it('does not trigger when the database node has no zone set', () => {
-    const g = graph([node('db', 'database')], []);
-    assert.equal(detect(g).length, 0);
-  });
-});
-
-describe('anti-pattern: single-az-database (via singleAzDatabase)', () => {
-  const detect = antiById('single-az-database');
+describe('restriction: single-az-database (via singleAzDatabase)', () => {
+  const detect = restrictionById('single-az-database');
 
   it('triggers when there is only one database node with no multiAz config', () => {
     const g = graph([node('db', 'database')], []);
     const violations = detect(g);
     assert.equal(violations.length, 1);
-    assert.equal(violations[0]!.antipattern, 'single-az-database');
+    assert.equal(violations[0]!.restriction, 'single-az-database');
   });
 
   it('does not trigger when there are two database nodes (treated as replica pair)', () => {

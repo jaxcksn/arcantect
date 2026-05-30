@@ -1,11 +1,11 @@
-import type { AnnotatedGraph, AntiPattern, Requirement, Rubric } from './types.ts'
+import type { AnnotatedGraph, Restriction, Requirement, Rubric, TradeoffWeights } from './types.ts'
 import type {
-  AntiPatternJson,
+  RestrictionJson,
   InlineDetect,
   RequirementJson,
   RubricJson,
 } from './puzzle-schema.ts'
-import { antiPatterns as builtinAntiPatterns } from './antipatterns.ts'
+import { restrictions as builtinRestrictions } from './restrictions.ts'
 import { canReach } from './graph.ts'
 
 // ---------------------------------------------------------------------------
@@ -22,7 +22,7 @@ function evalInlineDetect(det: InlineDetect, id: string, graph: AnnotatedGraph) 
     ? new Set(graph.nodes.filter(n => det.skip!.includes(n.runeType)).map(n => n.id))
     : undefined
   if (!canReach(fromIds, toIds, graph.edges, skipIds)) return []
-  return [{ antipattern: id, message: det.message }]
+  return [{ restriction: id, message: det.message }]
 }
 
 // ---------------------------------------------------------------------------
@@ -38,15 +38,17 @@ function compileRequirement(req: RequirementJson): Requirement {
   }
 }
 
-function compileAntiPattern(ap: AntiPatternJson): AntiPattern {
-  if ('ref' in ap) {
-    const found = Object.values(builtinAntiPatterns).find(b => b.id === ap.ref)
-    if (!found) throw new Error(`Unknown built-in anti-pattern ref: "${ap.ref}"`)
+function compileRestriction(r: RestrictionJson): Restriction {
+  if ('ref' in r) {
+    const found = Object.values(builtinRestrictions).find(b => b.id === r.ref)
+    if (!found) throw new Error(`Unknown built-in restriction ref: "${r.ref}"`)
     return found
   }
-  const { id, detect } = ap
+  const { id, label, hint, detect } = r
   return {
     id,
+    label,
+    hint,
     detect: (graph: AnnotatedGraph) => evalInlineDetect(detect, id, graph),
   }
 }
@@ -56,9 +58,14 @@ function compileAntiPattern(ap: AntiPatternJson): AntiPattern {
  * detect functions.  Safe to call at module load time.
  */
 export function compileRubric(rubric: RubricJson): Rubric {
+  // Support deprecated `requirements` as an alias for `hardConstraints`.
+  const hardConstraints = rubric.hardConstraints ?? rubric.requirements ?? []
   return {
-    requirements: rubric.requirements.map(compileRequirement),
-    antiPatterns: rubric.antiPatterns?.map(compileAntiPattern),
+    hardConstraints: hardConstraints.map(compileRequirement),
+    capabilityGoals: rubric.capabilityGoals,
+    tradeoffWeights: rubric.tradeoffWeights as TradeoffWeights | undefined,
+    tradeoffThreshold: rubric.tradeoffThreshold,
+    restrictions: rubric.restrictions?.map(compileRestriction),
     optimization: rubric.optimization,
     datalogRules: rubric.datalogRules,
   }

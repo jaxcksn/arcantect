@@ -73,6 +73,7 @@ function App() {
 
   const [briefOpen, setBriefOpen] = useState(true);
   const [reqsOpen, setReqsOpen] = useState(true);
+  const [restrictsOpen, setRestrictsOpen] = useState(true);
   const [violationsOpen, setViolationsOpen] = useState(true);
 
   const { screenToFlowPosition } = useReactFlow();
@@ -97,9 +98,9 @@ function App() {
   );
 
   const metCount = scoreResult
-    ? scoreResult.requirementResults.filter(r => r.passed).length
+    ? scoreResult.hardConstraintResults.filter(r => r.passed).length
     : 0;
-  const totalCount = scoreResult ? scoreResult.requirementResults.length : 0;
+  const totalCount = scoreResult ? scoreResult.hardConstraintResults.length : 0;
   const progressPct = totalCount > 0 ? (metCount / totalCount) * 100 : 0;
   const allRequirementsMet = totalCount > 0 && metCount === totalCount;
 
@@ -219,7 +220,7 @@ function App() {
                   </button>
                   {reqsOpen && (
                     <ul className='score-panel__checklist'>
-                      {scoreResult.requirementResults.map(req => (
+                      {scoreResult.hardConstraintResults.map(req => (
                         <li
                           key={req.id}
                           className={`score-panel__check-item${req.passed ? ' score-panel__check-item--met' : ''}`}
@@ -236,6 +237,45 @@ function App() {
                         </li>
                       ))}
                     </ul>
+                  )}
+
+                  {/* Collapsible: Restrictions — always visible */}
+                  {scoreResult.restrictionResults.length > 0 && (
+                    <>
+                      <button
+                        className='score-panel__section-toggle'
+                        onClick={() => setRestrictsOpen(o => !o)}
+                        aria-expanded={restrictsOpen}
+                      >
+                        <span className='score-panel__heading'>Restrictions</span>
+                        <span
+                          className='score-panel__toggle-icon'
+                          aria-hidden='true'
+                        >
+                          {restrictsOpen ? '▾' : '▸'}
+                        </span>
+                      </button>
+                      {restrictsOpen && (
+                        <ul className='score-panel__checklist'>
+                          {scoreResult.restrictionResults.map(r => (
+                            <li
+                              key={r.id}
+                              className={`score-panel__check-item${r.passed ? ' score-panel__check-item--met' : ' score-panel__check-item--violated'}`}
+                            >
+                              <span
+                                className='score-panel__check-marker'
+                                aria-hidden='true'
+                              >
+                                {r.passed ? '✦' : '✗'}
+                              </span>
+                              <span className='score-panel__check-label'>
+                                {r.label}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
                   )}
 
                   {/* Collapsible: Violations */}
@@ -260,7 +300,7 @@ function App() {
                         <ul className='score-panel__list'>
                           {scoreResult.violations.map((violation, index) => (
                             <li
-                              key={`${violation.antipattern}-${index}`}
+                              key={`${violation.restriction}-${index}`}
                               className='score-panel__item score-panel__item--violation'
                             >
                               <span

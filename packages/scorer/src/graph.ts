@@ -1,6 +1,5 @@
 /**
- * Shared graph traversal utilities used by both zone inference and
- * anti-pattern detection.  All functions are pure and operate on
+ * Shared graph traversal utilities.  All functions are pure and operate on
  * the minimal { source, target } edge shape so they work on both
  * ScorerEdge and any lightweight edge representation.
  */

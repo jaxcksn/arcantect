@@ -6,17 +6,22 @@ export type {
   ScoreResult,
   Violation,
   RequirementResult,
+  CapabilityResult,
+  RestrictionResult,
   Requirement,
-  AntiPattern,
+  CapabilityGoal,
+  Restriction,
   Rubric,
   PuzzleContext,
   ScorerNode,
   ScorerEdge,
   AnnotatedGraph,
-  Zone,
   FlowType,
   RawNode,
   RawEdge,
+  TradeoffDimension,
+  TradeoffProfile,
+  TradeoffWeights,
 } from './types.ts';
 
 export {
@@ -24,18 +29,18 @@ export {
   countNodesOfType,
   hasEdgeBetweenTypes,
   hasDirectPath,
-  allNodesInZone,
   puzzleHasTag,
 } from './rubric-helpers.ts';
 
-export { antiPatterns, detectAntiPatterns } from './antipatterns.ts';
+export { restrictions, detectRestrictions } from './restrictions.ts';
 
 export { compileRubric } from './puzzle-compiler.ts';
 export type {
   PuzzleJson,
   RubricJson,
   RequirementJson,
-  AntiPatternJson,
+  CapabilityGoalJson,
+  RestrictionJson,
   InlineDetect,
   InitialNodeJson,
   OptimizationJson,
@@ -44,7 +49,8 @@ export {
   PuzzleJsonSchema,
   RubricJsonSchema,
   RequirementJsonSchema,
-  AntiPatternJsonSchema,
+  CapabilityGoalJsonSchema,
+  RestrictionJsonSchema,
   InlineDetectSchema,
   InitialNodeJsonSchema,
   OptimizationJsonSchema,

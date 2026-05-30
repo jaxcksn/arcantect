@@ -9,8 +9,9 @@ import {
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { scoreGraph } from '@arcantect/scorer';
-import type { Puzzle } from '@model/Puzzle';
+import type { RawNode } from '@arcantect/scorer';
 import type { ArcEdge, ApplyEdge, DirectedEdge, HostsEdge, GameState } from '@model/GameState';
+import type { Puzzle } from '@model/Puzzle';
 import { NODE_REGISTRY } from '@nodes/registry';
 import { PUZZLES } from '@puzzles';
 
@@ -63,8 +64,16 @@ function ensureEdgeDefaults(edge: Edge): ArcEdge {
   } as DirectedEdge;
 }
 
+function withNodeData(nodes: Node[]): RawNode[] {
+  return nodes.map(n => ({
+    ...n,
+    capabilities: NODE_REGISTRY[n.data.nodeType as string]?.capabilities ?? [],
+    tradeoffs: NODE_REGISTRY[n.data.nodeType as string]?.tradeoffs,
+  }));
+}
+
 function scorePuzzle(puzzle: Puzzle, nodes: Node[], edges: ArcEdge[]) {
-  return scoreGraph(nodes, edges, puzzle.rubric, puzzle.context);
+  return scoreGraph(withNodeData(nodes), edges, puzzle.rubric, puzzle.context);
 }
 
 const STORAGE_KEY = 'arcantect.session.v1';
@@ -279,7 +288,7 @@ export const useGameStore = create<GameState>()(
     score() {
       const { puzzle, nodes, edges } = get();
       if (!puzzle) return;
-      const result = scoreGraph(nodes, edges, puzzle.rubric, puzzle.context);
+      const result = scoreGraph(withNodeData(nodes), edges, puzzle.rubric, puzzle.context);
       set(state => {
         state.scoreResult = result;
       });

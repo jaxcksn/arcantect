@@ -2,8 +2,6 @@
 // Core graph model
 // ---------------------------------------------------------------------------
 
-export type Zone = 'public' | 'dmz' | 'private' | 'data'
-
 export type FlowType =
   | 'user-request'
   | 'https-request'
@@ -21,7 +19,8 @@ export interface ScorerNode {
   runeType: string
   label: string
   config: Record<string, unknown>
-  zone?: Zone
+  capabilities: string[]
+  tradeoffs?: Partial<TradeoffProfile>
 }
 
 export interface ScorerEdge {
@@ -32,11 +31,10 @@ export interface ScorerEdge {
   direction: EdgeDirection
   flowType: FlowType
   encrypted: boolean
-  crossesZone: boolean
 }
 
 // ---------------------------------------------------------------------------
-// Annotated graph (fully resolved — zones set, edges annotated)
+// Annotated graph (fully resolved)
 // ---------------------------------------------------------------------------
 
 export interface AnnotatedGraph {
@@ -61,8 +59,17 @@ export interface Requirement {
   bonus?: boolean
 }
 
-export interface AntiPattern {
+export interface CapabilityGoal {
   id: string
+  label: string
+  hint: string
+}
+
+export interface Restriction {
+  id: string
+  /** Thematic label shown in the side panel — describes what is restricted. */
+  label: string
+  hint: string
   detect: (graph: AnnotatedGraph) => Violation[]
 }
 
@@ -73,14 +80,45 @@ export interface Optimization {
   maxEdges: number
 }
 
+// ---------------------------------------------------------------------------
+// Tradeoff profile
+// ---------------------------------------------------------------------------
+
+export type TradeoffDimension =
+  | 'latency'
+  | 'cost'
+  | 'complexity'
+  | 'operability'
+  | 'throughput'
+  | 'security'
+  | 'consistency'
+  | 'blastRadius'
+
+/** Signed integer deltas. Positive = better on that dimension. */
+export type TradeoffProfile = Record<TradeoffDimension, number>
+
+/** Per-puzzle weights. Dimensions absent from the map are ignored in scoring. */
+export type TradeoffWeights = Partial<Record<TradeoffDimension, number>>
+
+// ---------------------------------------------------------------------------
+// Rubric
+// ---------------------------------------------------------------------------
+
 export interface Rubric {
-  requirements: Requirement[]
-  antiPatterns?: AntiPattern[]
-  /** Optional budget for the "perfect" tier. */
+  hardConstraints: Requirement[]
+  capabilityGoals?: CapabilityGoal[]
+  tradeoffWeights?: TradeoffWeights
+  tradeoffThreshold?: number
+  restrictions?: Restriction[]
+  /** Optional budget for the ★★★ tier. */
   optimization?: Optimization
   /** Optional Datalog rules string; evaluated in parallel with predicate checks. */
   datalogRules?: string
 }
+
+// ---------------------------------------------------------------------------
+// Result types
+// ---------------------------------------------------------------------------
 
 export interface RequirementResult {
   id: string
@@ -90,12 +128,27 @@ export interface RequirementResult {
   bonus: boolean
 }
 
+export interface CapabilityResult {
+  id: string
+  label: string
+  hint: string
+  passed: boolean
+}
+
+export interface RestrictionResult {
+  id: string
+  label: string
+  hint: string
+  /** true when the restriction is upheld (detect produced no violations) */
+  passed: boolean
+}
+
 // ---------------------------------------------------------------------------
-// Anti-pattern violations
+// Restriction violations
 // ---------------------------------------------------------------------------
 
 export interface Violation {
-  antipattern: string
+  restriction: string
   message: string
   nodeIds?: string[]
   edgeIds?: string[]
@@ -106,12 +159,17 @@ export interface Violation {
 // ---------------------------------------------------------------------------
 
 export interface ScoreResult {
+  /** Structural diagram violations (from Datalog violation() facts). */
   violations: Violation[]
-  requirementResults: RequirementResult[]
-  /** true when every non-bonus requirement is met and no violations are present */
+  hardConstraintResults: RequirementResult[]
+  capabilityResults: CapabilityResult[]
+  tradeoffProfile: TradeoffProfile
+  /** Always populated — one entry per restriction in the rubric. */
+  restrictionResults: RestrictionResult[]
+  /** true when every non-bonus hard constraint is met, all restrictions hold, and no violations are present */
   passed: boolean
-  /** true when passed, every bonus requirement is met, and the solution is within the puzzle's optimization budget */
-  perfect: boolean
+  /** 1 = passed; 2 = passed + all capability goals met; 3 = ★★ + tradeoff score >= threshold + within budget */
+  stars: 1 | 2 | 3
 }
 
 // ---------------------------------------------------------------------------
@@ -122,6 +180,10 @@ export interface ScoreResult {
 export interface RawNode {
   id: string
   data: Record<string, unknown>
+  /** Capabilities injected by the client before passing to scoreGraph. */
+  capabilities?: string[]
+  /** Tradeoff deltas injected by the client before passing to scoreGraph. */
+  tradeoffs?: Partial<TradeoffProfile>
 }
 
 export interface RawEdge {

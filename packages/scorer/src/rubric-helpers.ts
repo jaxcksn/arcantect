@@ -53,18 +53,6 @@ export function hasDirectPath(
 }
 
 /**
- * True when ALL nodes of runeType are in the given zone.
- */
-export function allNodesInZone(
-  graph: AnnotatedGraph,
-  runeType: string,
-  zone: string,
-): boolean {
-  const nodes = graph.nodes.filter(n => n.runeType === runeType)
-  return nodes.length > 0 && nodes.every(n => n.zone === zone)
-}
-
-/**
  * True when the puzzle carries the given tag.
  */
 export function puzzleHasTag(graph: AnnotatedGraph, tag: string): boolean {

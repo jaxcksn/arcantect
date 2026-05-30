@@ -5,7 +5,7 @@ import type { RawEdge, RawNode, ScorerEdge, ScorerNode, FlowType } from './types
 // Ordered from most specific to least so inference rules are unambiguous.
 // ---------------------------------------------------------------------------
 
-export const PUBLIC_TYPES = new Set(['cdn', 'load_balancer', 'api_gateway', 'waf', 'dns', 'internet', 'certificate', 'payment_processor', 'firewall', 'vpn', 'application'])
+export const PUBLIC_TYPES = new Set(['cdn', 'load_balancer', 'api_gateway', 'waf', 'dns', 'internet', 'payment_processor', 'firewall', 'vpn', 'application'])
 export const DMZ_TYPES = new Set(['compute', 'serverless', 'auth', 'orchestrator', 'identity_provider', 'foundation_model', 'ml_platform', 'container', 'kubernetes'])
 export const PRIVATE_TYPES = new Set(['cache', 'queue', 'private_network', 'event_bus', 'streaming', 'monitoring', 'log_aggregator', 'tracing', 'metrics', 'alerting'])
 export const DATA_TYPES = new Set(['database', 'object_storage', 'nosql_database', 'secrets_manager', 'search', 'static_assets'])
@@ -32,7 +32,7 @@ function inferFlowType(sourceType: string, targetType: string): FlowType {
   return 'internal-rpc'
 }
 
-// Edges whose source is a public-zone rune type carry encrypted traffic.
+// Edges from public-facing rune types carry encrypted traffic by default.
 function inferEncrypted(sourceType: string): boolean {
   return PUBLIC_TYPES.has(sourceType)
 }
@@ -54,6 +54,8 @@ export function normalizeNodes(rawNodes: readonly RawNode[]): ScorerNode[] {
       runeType,
       label: runeType,
       config,
+      capabilities: node.capabilities ?? [],
+      tradeoffs: node.tradeoffs,
     }
   })
 }
@@ -82,7 +84,6 @@ export function normalizeEdges(
       direction,
       flowType: isHosts ? 'deployment' : inferFlowType(sourceType, targetType),
       encrypted: isHosts ? false : (configEncrypted === true ? true : inferEncrypted(sourceType)),
-      crossesZone: false,
     }
   })
 }

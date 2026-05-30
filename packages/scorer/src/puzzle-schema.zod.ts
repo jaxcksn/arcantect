@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
-// InlineDetect — detect expression for inline anti-patterns
+// InlineDetect — detect expression for inline restrictions
 // ---------------------------------------------------------------------------
 
 export const InlineDetectSchema = z.object({
@@ -15,15 +15,15 @@ export const InlineDetectSchema = z.object({
 export type InlineDetect = z.infer<typeof InlineDetectSchema>;
 
 // ---------------------------------------------------------------------------
-// AntiPatternJson
+// RestrictionJson
 // ---------------------------------------------------------------------------
 
-export const AntiPatternJsonSchema = z.union([
+export const RestrictionJsonSchema = z.union([
   z.object({ ref: z.string() }),
-  z.object({ id: z.string(), detect: InlineDetectSchema }),
+  z.object({ id: z.string(), label: z.string(), hint: z.string(), detect: InlineDetectSchema }),
 ]);
 
-export type AntiPatternJson = z.infer<typeof AntiPatternJsonSchema>;
+export type RestrictionJson = z.infer<typeof RestrictionJsonSchema>;
 
 // ---------------------------------------------------------------------------
 // RequirementJson
@@ -39,6 +39,18 @@ export const RequirementJsonSchema = z.object({
 export type RequirementJson = z.infer<typeof RequirementJsonSchema>;
 
 // ---------------------------------------------------------------------------
+// CapabilityGoalJson
+// ---------------------------------------------------------------------------
+
+export const CapabilityGoalJsonSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  hint: z.string(),
+});
+
+export type CapabilityGoalJson = z.infer<typeof CapabilityGoalJsonSchema>;
+
+// ---------------------------------------------------------------------------
 // OptimizationJson
 // ---------------------------------------------------------------------------
 
@@ -51,14 +63,24 @@ export type OptimizationJson = z.infer<typeof OptimizationJsonSchema>;
 
 // ---------------------------------------------------------------------------
 // RubricJson
+// Supports both `hardConstraints` (new) and `requirements` (deprecated alias).
+// At least one must be present and non-empty.
 // ---------------------------------------------------------------------------
 
 export const RubricJsonSchema = z.object({
-  requirements: z.array(RequirementJsonSchema).min(1),
-  antiPatterns: z.array(AntiPatternJsonSchema).optional(),
+  hardConstraints: z.array(RequirementJsonSchema).optional(),
+  /** @deprecated Use hardConstraints instead. Treated as an alias during parsing. */
+  requirements: z.array(RequirementJsonSchema).optional(),
+  capabilityGoals: z.array(CapabilityGoalJsonSchema).optional(),
+  tradeoffWeights: z.record(z.string(), z.number()).optional(),
+  tradeoffThreshold: z.number().optional(),
+  restrictions: z.array(RestrictionJsonSchema).optional(),
   optimization: OptimizationJsonSchema.optional(),
   datalogRules: z.string().optional(),
-});
+}).refine(
+  data => ((data.hardConstraints ?? data.requirements) ?? []).length > 0,
+  { message: 'hardConstraints (or deprecated requirements) must have at least 1 item' },
+);
 
 export type RubricJson = z.infer<typeof RubricJsonSchema>;
 

@@ -102,7 +102,7 @@
             "additionalProperties": false
           }
         },
-        "antiPatterns": {
+        "restrictions": {
           "type": "array",
           "items": {
             "anyOf": [
@@ -122,6 +122,12 @@
                 "type": "object",
                 "properties": {
                   "id": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "hint": {
                     "type": "string"
                   },
                   "detect": {
@@ -164,6 +170,8 @@
                 },
                 "required": [
                   "id",
+                  "label",
+                  "hint",
                   "detect"
                 ],
                 "additionalProperties": false

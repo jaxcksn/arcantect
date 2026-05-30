@@ -1,6 +1,6 @@
 export { parseProgram } from "./parser.js";
 export { evaluate } from "./evaluator.js";
-export { factExists, allFacts, violations, requirementResults } from "./query.js";
+export { factExists, allFacts, violations, requirementResults, capgoalResults } from "./query.js";
 export type {
   AstRule,
   AstAtom,

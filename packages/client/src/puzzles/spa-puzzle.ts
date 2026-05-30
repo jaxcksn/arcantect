@@ -22,110 +22,96 @@ const spaPuzzle: PuzzleJson = {
     },
   ],
   rubric: {
-    requirements: [
+    hardConstraints: [
       {
         id: 'starts-from-internet',
         label:
           'Visitors should find the signboard by a name they can remember.',
-        hint: 'Use the DNS to give internet traffic a URL to visit.',
+        hint: 'Connect the Internet node to a DNS node.',
       },
       {
-        id: 'needs-object-storage',
-        label:
-          "The signboard is made of objects, we don't need a living servant to hand out scrolls.",
-        hint: "Object Storage stores static assets, ideal for things that don't change often.",
-      },
-      {
-        id: 'assets-in-storage',
-        label:
-          'The painted notices must be kept in the storehouse, not scattered across the road.',
-        hint: 'Connect the Static Assets to Object Storage — that is where the SPA files live.',
-      },
-      {
-        id: 'cdn-fronts-storage',
-        label:
-          'Festival crowds should read nearby copies instead of all crowding the theater storehouse.',
-        hint: 'A CDN should serve cached copies of the website, which it fetches from Object Storage as needed.',
-      },
-      {
-        id: 'dns-routes-to-cdn',
-        label:
-          'The remembered name should send visitors not to the scrolls themselves, but to the fastest public entrance.',
-        hint: 'DNS routes to the CDN instead of the Object Storage bucket.',
-      },
-      {
-        id: 'https-certificate',
-        label:
-          "Every copy of the signboard must bear the theater's official seal.",
-        hint: 'A certificate enables HTTPS and TLS, and should be assigned to the CDN.',
-      },
-      {
-        id: 'storage-not-public',
-        label:
-          'We should probably keep the scrolls that make up the signboard inside the castle for safekeeping.',
-        hint: 'The Object Storage bucket should not be directly internet-accessible — it should only be reachable through the CDN.',
-      },
-      {
-        id: 'waf-protects-cdn',
-        label:
-          'Mischievous sprites should meet a protective ward before they can trouble the signboard. (Bonus)',
-        hint: 'A WAF can filter malicious traffic before it reaches the CDN.',
-        bonus: true,
+        id: 'static-files-distributed',
+        label: 'Something needs to distribute the scrolls.',
+        hint: 'Connect a path from Internet to Static Assets that passes through a static-origin node, such as Object Storage.',
       },
     ],
+    capabilityGoals: [
+      {
+        id: 'edge-delivery-present',
+        label:
+          'Festival crowds should read nearby copies, not crowd the storehouse.',
+        hint: 'Add a node with edge-delivery capability (e.g., a CDN) reachable from the internet.',
+      },
+      {
+        id: 'storage-at-origin',
+        label:
+          "The scrolls must rest in a proper storehouse, not a living servant's hands.",
+        hint: 'Use Object Storage (not a compute node) as the origin — compute has both static-origin and compute-layer capabilities.',
+      },
+      {
+        id: 'dns-routes-to-delivery',
+        label:
+          'The remembered name should lead visitors to the fastest entrance.',
+        hint: 'DNS must reach a node with edge-delivery capability (e.g., a CDN).',
+      },
+    ],
+    tradeoffWeights: {
+      latency: 2,
+      cost: 1,
+      operability: 1,
+      security: 1,
+    },
+    tradeoffThreshold: 6,
     datalogRules: `
       reaches(X, Y) :- edge(X, Y).
       reaches(X, Z) :- edge(X, Y), reaches(Y, Z).
 
-      associated(X, Y) :- edge(X, Y).
-      associated(X, Y) :- edge(Y, X).
+      // Helper facts for hard constraints
+      hasInternetToDns("yes") :- node(I, "internet"), node(R, "dns"), edge(I, R).
+      hasInternetToStaticFilesThroughOrigin("yes") :-
+        node(I, "internet"),
+        node(F, "static_assets"),
+        node(O, _),
+        capability(O, "static-origin"),
+        reaches(I, O),
+        reaches(O, F).
 
-      // Reachability that never steps through a cdn node (used for storage-not-public).
-      noCdnReach(X, Y) :- edge(X, Y), !node(X, "cdn").
-      noCdnReach(X, Z) :- edge(X, Y), !node(X, "cdn"), noCdnReach(Y, Z).
+      // Hard constraints
+      req("starts-from-internet", "pass") :- hasInternetToDns("yes").
+      req("starts-from-internet", "fail") :- !hasInternetToDns("yes").
 
-      // Helper facts — used for negation-as-failure in the fail rules below.
-      hasInternetToDns("yes")     :- node(I, "internet"), node(R, "dns"), edge(I, R).
-      hasCdnFrontsStorage("yes")  :- node(C, "cdn"), node(S, "object_storage"), edge(C, S).
-      hasDnsToCdn("yes")          :- node(R, "dns"), node(C, "cdn"), reaches(R, C).
-      hasCertForCdn("yes")        :- node(A, "certificate"), node(C, "cdn"), associated(A, C).
-      hasWafForCdn("yes")         :- node(W, "waf"), node(C, "cdn"), associated(W, C).
-      hasAssetsInStorage("yes")   :- node(A, "static_assets"), node(S, "object_storage"), edge(A, S).
+      req("static-files-distributed", "pass") :- hasInternetToStaticFilesThroughOrigin("yes").
+      req("static-files-distributed", "fail") :- !hasInternetToStaticFilesThroughOrigin("yes").
 
-      // Storage is publicly exposed if internet can reach it without going through any CDN.
-      directPublicStorage(S) :-
-        node(S, "object_storage"), node(I, "internet"), noCdnReach(I, S).
-      storageExposed("yes") :- directPublicStorage(_).
+      // Capability goals — evaluated via capgoal(id, outcome) predicate
+      edgeDeliveryReachable("yes") :-
+        node(I, "internet"), node(C, _), capability(C, "edge-delivery"), reaches(I, C).
 
-      req("starts-from-internet",  "pass") :- hasInternetToDns("yes").
-      req("starts-from-internet",  "fail") :- !hasInternetToDns("yes").
+      capgoal("edge-delivery-present", "pass") :- edgeDeliveryReachable("yes").
+      capgoal("edge-delivery-present", "fail") :- !edgeDeliveryReachable("yes").
 
-      req("needs-object-storage",  "pass") :- node(_, "object_storage").
-      req("needs-object-storage",  "fail") :- !node(_, "object_storage").
+      // Passes only when a static-origin node exists that is NOT also a compute-layer.
+      // This blocks raw compute (Server) from satisfying this goal.
+      hasStaticOriginNotCompute("yes") :-
+        node(S, T),
+        capability(S, "static-origin"),
+        !capability(S, "compute-layer"),
+        T != "static_assets".
 
-      req("assets-in-storage",     "pass") :- hasAssetsInStorage("yes").
-      req("assets-in-storage",     "fail") :- !hasAssetsInStorage("yes").
+      capgoal("storage-at-origin", "pass") :- hasStaticOriginNotCompute("yes").
+      capgoal("storage-at-origin", "fail") :- !hasStaticOriginNotCompute("yes").
 
-      req("cdn-fronts-storage",    "pass") :- hasCdnFrontsStorage("yes").
-      req("cdn-fronts-storage",    "fail") :- !hasCdnFrontsStorage("yes").
+      dnsToEdgeDelivery("yes") :-
+        node(R, "dns"), node(C, _), capability(C, "edge-delivery"), reaches(R, C).
 
-      req("dns-routes-to-cdn",     "pass") :- hasDnsToCdn("yes").
-      req("dns-routes-to-cdn",     "fail") :- !hasDnsToCdn("yes").
-
-      req("https-certificate",     "pass") :- hasCertForCdn("yes").
-      req("https-certificate",     "fail") :- !hasCertForCdn("yes").
-
-      req("storage-not-public",    "pass") :- node(_, "object_storage"), !storageExposed("yes").
-      req("storage-not-public",    "fail") :- node(_, "object_storage"),  storageExposed("yes").
-
-      req("waf-protects-cdn",      "pass") :- hasWafForCdn("yes").
-      req("waf-protects-cdn",      "fail") :- !hasWafForCdn("yes").
+      capgoal("dns-routes-to-delivery", "pass") :- dnsToEdgeDelivery("yes").
+      capgoal("dns-routes-to-delivery", "fail") :- !dnsToEdgeDelivery("yes").
 
       violation("unencrypted-cross-zone", E) :-
         edgeMeta(E, "crossesZone", "true"),
         !edgeMeta(E, "encrypted", "true").
     `,
-    optimization: { maxNodes: 7, maxEdges: 7 },
+    optimization: { maxNodes: 6, maxEdges: 6 },
   },
 };
 

@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { parseProgram } from "../parser.js";
 import { evaluate } from "../evaluator.js";
-import { requirementResults, violations } from "../query.js";
+import { requirementResults, capgoalResults, violations } from "../query.js";
 import type { Fact } from "../types.js";
 
 const SPA_RULES = `
@@ -15,39 +15,46 @@ const SPA_RULES = `
   associated(X, Y) :- edge(X, Y).
   associated(X, Y) :- edge(Y, X).
 
-  noCdnReach(X, Y) :- edge(X, Y), !node(X, "cdn").
-  noCdnReach(X, Z) :- edge(X, Y), !node(X, "cdn"), noCdnReach(Y, Z).
+  hasInternetToDns("yes")       :- node(I, "internet"), node(R, "dns"), edge(I, R).
+  hasCertForEdgeDelivery("yes") :- node(A, "certificate"), node(C, _), capability(C, "edge-delivery"), associated(A, C).
 
-  hasInternetToDns("yes")     :- node(I, "internet"), node(R, "dns"), edge(I, R).
-  hasCdnFrontsStorage("yes")  :- node(C, "cdn"), node(S, "object_storage"), edge(C, S).
-  hasDnsToCdn("yes")          :- node(R, "dns"), node(C, "cdn"), reaches(R, C).
-  hasCertForCdn("yes")        :- node(A, "certificate"), node(C, "cdn"), associated(A, C).
-  hasWafForCdn("yes")         :- node(W, "waf"), node(C, "cdn"), associated(W, C).
+  hasInternetToStaticFilesThroughOrigin("yes") :-
+    node(I, "internet"),
+    node(F, "static_assets"),
+    node(O, _),
+    capability(O, "static-origin"),
+    reaches(I, O),
+    reaches(O, F).
 
-  directPublicStorage(S) :-
-    node(S, "object_storage"), node(I, "internet"), noCdnReach(I, S).
-  storageExposed("yes") :- directPublicStorage(_).
+  req("starts-from-internet", "pass") :- hasInternetToDns("yes").
+  req("starts-from-internet", "fail") :- !hasInternetToDns("yes").
 
-  req("starts-from-internet",  "pass") :- hasInternetToDns("yes").
-  req("starts-from-internet",  "fail") :- !hasInternetToDns("yes").
+  req("static-files-distributed", "pass") :- hasInternetToStaticFilesThroughOrigin("yes").
+  req("static-files-distributed", "fail") :- !hasInternetToStaticFilesThroughOrigin("yes").
 
-  req("needs-object-storage",  "pass") :- node(_, "object_storage").
-  req("needs-object-storage",  "fail") :- !node(_, "object_storage").
+  req("https-certificate", "pass") :- hasCertForEdgeDelivery("yes").
+  req("https-certificate", "fail") :- !hasCertForEdgeDelivery("yes").
 
-  req("cdn-fronts-storage",    "pass") :- hasCdnFrontsStorage("yes").
-  req("cdn-fronts-storage",    "fail") :- !hasCdnFrontsStorage("yes").
+  edgeDeliveryReachable("yes") :-
+    node(I, "internet"), node(C, _), capability(C, "edge-delivery"), reaches(I, C).
 
-  req("dns-routes-to-cdn",     "pass") :- hasDnsToCdn("yes").
-  req("dns-routes-to-cdn",     "fail") :- !hasDnsToCdn("yes").
+  capgoal("edge-delivery-present", "pass") :- edgeDeliveryReachable("yes").
+  capgoal("edge-delivery-present", "fail") :- !edgeDeliveryReachable("yes").
 
-  req("https-certificate",     "pass") :- hasCertForCdn("yes").
-  req("https-certificate",     "fail") :- !hasCertForCdn("yes").
+  hasStaticOriginNotCompute("yes") :-
+    node(S, T),
+    capability(S, "static-origin"),
+    !capability(S, "compute-layer"),
+    T != "static_assets".
 
-  req("storage-not-public",    "pass") :- node(_, "object_storage"), !storageExposed("yes").
-  req("storage-not-public",    "fail") :- node(_, "object_storage"),  storageExposed("yes").
+  capgoal("storage-at-origin", "pass") :- hasStaticOriginNotCompute("yes").
+  capgoal("storage-at-origin", "fail") :- !hasStaticOriginNotCompute("yes").
 
-  req("waf-protects-cdn",      "pass") :- hasWafForCdn("yes").
-  req("waf-protects-cdn",      "fail") :- !hasWafForCdn("yes").
+  dnsToEdgeDelivery("yes") :-
+    node(R, "dns"), node(C, _), capability(C, "edge-delivery"), reaches(R, C).
+
+  capgoal("dns-routes-to-delivery", "pass") :- dnsToEdgeDelivery("yes").
+  capgoal("dns-routes-to-delivery", "fail") :- !dnsToEdgeDelivery("yes").
 
   violation("unencrypted-cross-zone", E) :-
     edgeMeta(E, "crossesZone", "true"),
@@ -56,85 +63,127 @@ const SPA_RULES = `
 
 const rules = parseProgram(SPA_RULES);
 
-/** Minimal correct SPA: internet → dns → cdn → object_storage, certificate on cdn */
+/**
+ * Reference solution: internet → dns → cdn → object_storage → static_assets, certificate on cdn.
+ * CDN has edge-delivery capability; object_storage has static-origin (no compute-layer).
+ */
 const correctEdb: Fact[] = [
-  { predicate: "node", terms: ["i1", "internet"] },
-  { predicate: "node", terms: ["d1", "dns"] },
-  { predicate: "node", terms: ["c1", "cdn"] },
-  { predicate: "node", terms: ["s1", "object_storage"] },
-  { predicate: "node", terms: ["cert1", "certificate"] },
-  { predicate: "edge", terms: ["i1", "d1"] },
-  { predicate: "edge", terms: ["d1", "c1"] },
-  { predicate: "edge", terms: ["c1", "s1"] },
-  { predicate: "edge", terms: ["cert1", "c1"] },
+  { predicate: "node",       terms: ["i1",    "internet"]       },
+  { predicate: "node",       terms: ["d1",    "dns"]            },
+  { predicate: "node",       terms: ["c1",    "cdn"]            },
+  { predicate: "node",       terms: ["s1",    "object_storage"] },
+  { predicate: "node",       terms: ["f1",    "static_assets"]  },
+  { predicate: "node",       terms: ["cert1", "certificate"]    },
+  { predicate: "capability", terms: ["c1",    "edge-delivery"]  },
+  { predicate: "capability", terms: ["s1",    "static-origin"]  },
+  { predicate: "capability", terms: ["f1",    "static-origin"]  },
+  { predicate: "edge",       terms: ["i1",    "d1"]             },
+  { predicate: "edge",       terms: ["d1",    "c1"]             },
+  { predicate: "edge",       terms: ["c1",    "s1"]             },
+  { predicate: "edge",       terms: ["s1",    "f1"]             },
+  { predicate: "edge",       terms: ["cert1", "c1"]             },
 ];
 
 describe("SPA puzzle — correct architecture", () => {
   const result = evaluate(rules, correctEdb);
   const reqs = requirementResults(result);
+  const caps = capgoalResults(result);
   const reqMap = Object.fromEntries(reqs.map(r => [r.id, r.passed]));
+  const capMap = Object.fromEntries(caps.map(r => [r.id, r.passed]));
 
   it("starts-from-internet passes", () => expect(reqMap["starts-from-internet"]).toBe(true));
-  it("needs-object-storage passes", () => expect(reqMap["needs-object-storage"]).toBe(true));
-  it("cdn-fronts-storage passes", () => expect(reqMap["cdn-fronts-storage"]).toBe(true));
-  it("dns-routes-to-cdn passes", () => expect(reqMap["dns-routes-to-cdn"]).toBe(true));
+  it("static-files-distributed passes", () => expect(reqMap["static-files-distributed"]).toBe(true));
   it("https-certificate passes", () => expect(reqMap["https-certificate"]).toBe(true));
-  it("storage-not-public passes", () => expect(reqMap["storage-not-public"]).toBe(true));
-  it("waf-protects-cdn fails (no waf node)", () => expect(reqMap["waf-protects-cdn"]).toBe(false));
+  it("edge-delivery-present passes", () => expect(capMap["edge-delivery-present"]).toBe(true));
+  it("storage-at-origin passes (object_storage has static-origin, not compute-layer)", () => expect(capMap["storage-at-origin"]).toBe(true));
+  it("dns-routes-to-delivery passes", () => expect(capMap["dns-routes-to-delivery"]).toBe(true));
   it("no violations", () => expect(violations(result)).toHaveLength(0));
 });
 
-describe("SPA puzzle — storage directly internet-accessible", () => {
+describe("SPA puzzle — compute serves files (storage-at-origin should fail)", () => {
+  // Compute node has both static-origin AND compute-layer — storage-at-origin must fail.
   const edb: Fact[] = [
-    ...correctEdb,
-    // Direct internet → object_storage edge bypasses the CDN
-    { predicate: "edge", terms: ["i1", "s1"] },
+    { predicate: "node",       terms: ["i1",   "internet"]      },
+    { predicate: "node",       terms: ["d1",   "dns"]           },
+    { predicate: "node",       terms: ["c1",   "cdn"]           },
+    { predicate: "node",       terms: ["srv1", "compute"]       },
+    { predicate: "node",       terms: ["f1",   "static_assets"] },
+    { predicate: "node",       terms: ["cert1","certificate"]   },
+    { predicate: "capability", terms: ["c1",   "edge-delivery"] },
+    { predicate: "capability", terms: ["srv1", "static-origin"] },
+    { predicate: "capability", terms: ["srv1", "compute-layer"] },
+    { predicate: "capability", terms: ["f1",   "static-origin"] },
+    { predicate: "edge",       terms: ["i1",   "d1"]            },
+    { predicate: "edge",       terms: ["d1",   "c1"]            },
+    { predicate: "edge",       terms: ["c1",   "srv1"]          },
+    { predicate: "edge",       terms: ["srv1", "f1"]            },
+    { predicate: "edge",       terms: ["cert1","c1"]            },
+  ];
+  const result = evaluate(rules, edb);
+  const caps = capgoalResults(result);
+  const capMap = Object.fromEntries(caps.map(r => [r.id, r.passed]));
+
+  it("storage-at-origin fails (compute has both static-origin and compute-layer)", () =>
+    expect(capMap["storage-at-origin"]).toBe(false));
+  it("edge-delivery-present still passes", () =>
+    expect(capMap["edge-delivery-present"]).toBe(true));
+  it("dns-routes-to-delivery still passes", () =>
+    expect(capMap["dns-routes-to-delivery"]).toBe(true));
+});
+
+describe("SPA puzzle — static files not connected through origin", () => {
+  const edb: Fact[] = [
+    { predicate: "node",       terms: ["i1",    "internet"]       },
+    { predicate: "node",       terms: ["d1",    "dns"]            },
+    { predicate: "node",       terms: ["c1",    "cdn"]            },
+    { predicate: "node",       terms: ["s1",    "object_storage"] },
+    { predicate: "node",       terms: ["f1",    "static_assets"]  },
+    { predicate: "node",       terms: ["cert1", "certificate"]    },
+    { predicate: "capability", terms: ["c1",    "edge-delivery"]  },
+    { predicate: "capability", terms: ["s1",    "static-origin"]  },
+    { predicate: "capability", terms: ["f1",    "static-origin"]  },
+    { predicate: "edge",       terms: ["i1",    "d1"]             },
+    { predicate: "edge",       terms: ["d1",    "c1"]             },
+    { predicate: "edge",       terms: ["c1",    "s1"]             },
+    { predicate: "edge",       terms: ["cert1", "c1"]             },
   ];
   const result = evaluate(rules, edb);
   const reqs = requirementResults(result);
   const reqMap = Object.fromEntries(reqs.map(r => [r.id, r.passed]));
 
-  it("storage-not-public fails", () => expect(reqMap["storage-not-public"]).toBe(false));
-  it("cdn-fronts-storage still passes (cdn still connects to storage)", () =>
-    expect(reqMap["cdn-fronts-storage"]).toBe(true));
+  it("static-files-distributed fails", () => expect(reqMap["static-files-distributed"]).toBe(false));
+  it("https-certificate still passes", () => expect(reqMap["https-certificate"]).toBe(true));
 });
 
 describe("SPA puzzle — missing CDN", () => {
+  // DNS routes directly to object_storage — no edge-delivery node in the graph.
   const edb: Fact[] = [
-    { predicate: "node", terms: ["i1", "internet"] },
-    { predicate: "node", terms: ["d1", "dns"] },
-    { predicate: "node", terms: ["s1", "object_storage"] },
-    { predicate: "node", terms: ["cert1", "certificate"] },
-    { predicate: "edge", terms: ["i1", "d1"] },
-    { predicate: "edge", terms: ["d1", "s1"] },
+    { predicate: "node",       terms: ["i1",   "internet"]      },
+    { predicate: "node",       terms: ["d1",   "dns"]           },
+    { predicate: "node",       terms: ["s1",   "object_storage"]},
+    { predicate: "node",       terms: ["f1",   "static_assets"] },
+    { predicate: "node",       terms: ["cert1","certificate"]   },
+    { predicate: "capability", terms: ["s1",   "static-origin"] },
+    { predicate: "capability", terms: ["f1",   "static-origin"] },
+    { predicate: "edge",       terms: ["i1",   "d1"]            },
+    { predicate: "edge",       terms: ["d1",   "s1"]            },
+    { predicate: "edge",       terms: ["s1",   "f1"]            },
   ];
   const result = evaluate(rules, edb);
   const reqs = requirementResults(result);
+  const caps = capgoalResults(result);
   const reqMap = Object.fromEntries(reqs.map(r => [r.id, r.passed]));
+  const capMap = Object.fromEntries(caps.map(r => [r.id, r.passed]));
 
-  it("cdn-fronts-storage fails", () => expect(reqMap["cdn-fronts-storage"]).toBe(false));
-  it("dns-routes-to-cdn fails (no cdn node)", () => expect(reqMap["dns-routes-to-cdn"]).toBe(false));
-  it("storage-not-public fails (internet reaches storage without cdn)", () =>
-    expect(reqMap["storage-not-public"]).toBe(false));
-});
-
-describe("SPA puzzle — WAF bonus", () => {
-  const edb: Fact[] = [
-    ...correctEdb,
-    { predicate: "node", terms: ["w1", "waf"] },
-    { predicate: "edge", terms: ["w1", "c1"] },
-  ];
-  const result = evaluate(rules, edb);
-  const reqs = requirementResults(result);
-  const reqMap = Object.fromEntries(reqs.map(r => [r.id, r.passed]));
-
-  it("waf-protects-cdn passes", () => expect(reqMap["waf-protects-cdn"]).toBe(true));
-  it("all core requirements still pass", () => {
-    for (const id of ["starts-from-internet", "needs-object-storage", "cdn-fronts-storage",
-                      "dns-routes-to-cdn", "https-certificate", "storage-not-public"]) {
-      expect(reqMap[id]).toBe(true);
-    }
-  });
+  it("static-files-distributed passes", () =>
+    expect(reqMap["static-files-distributed"]).toBe(true));
+  it("https-certificate fails (no edge-delivery node for certificate)", () =>
+    expect(reqMap["https-certificate"]).toBe(false));
+  it("edge-delivery-present fails", () => expect(capMap["edge-delivery-present"]).toBe(false));
+  it("dns-routes-to-delivery fails (no edge-delivery node)", () =>
+    expect(capMap["dns-routes-to-delivery"]).toBe(false));
+  it("storage-at-origin passes (object_storage has static-origin but no compute-layer)", () =>
+    expect(capMap["storage-at-origin"]).toBe(true));
 });
 
 describe("SPA puzzle — unencrypted cross-zone violation", () => {

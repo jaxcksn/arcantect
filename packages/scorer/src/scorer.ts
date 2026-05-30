@@ -5,18 +5,76 @@ import type {
   PuzzleContext,
   ScoreResult,
   RequirementResult,
+  RestrictionResult,
   AnnotatedGraph,
   Violation,
+  TradeoffProfile,
+  TradeoffDimension,
+  TradeoffWeights,
+  CapabilityResult,
+  ScorerNode,
 } from './types.ts'
 import { normalizeNodes, normalizeEdges } from './normalize.ts'
-import { inferZones, annotateEdgeCrossings } from './zones.ts'
-import { parseProgram, evaluate, violations as dlViolations, requirementResults as dlRequirementResults } from '@arcantect/datalog'
-import { graphToFacts, ZONE_SEED_RULES } from './datalog-factgen.ts'
+import {
+  parseProgram,
+  evaluate,
+  violations as dlViolations,
+  requirementResults as dlRequirementResults,
+  capgoalResults as dlCapgoalResults,
+} from '@arcantect/datalog'
+import { graphToFacts } from './datalog-factgen.ts'
+
+const ZERO_PROFILE: TradeoffProfile = {
+  latency: 0,
+  cost: 0,
+  complexity: 0,
+  operability: 0,
+  throughput: 0,
+  security: 0,
+  consistency: 0,
+  blastRadius: 0,
+}
+
+function aggregateTradeoffs(nodes: ScorerNode[]): TradeoffProfile {
+  const profile = { ...ZERO_PROFILE }
+  for (const node of nodes) {
+    for (const [dim, delta] of Object.entries(node.tradeoffs ?? {})) {
+      profile[dim as TradeoffDimension] += delta as number
+    }
+  }
+  return profile
+}
+
+function calcTradeoffScore(profile: TradeoffProfile, weights: TradeoffWeights): number {
+  return Object.entries(weights).reduce((sum, [dim, w]) => {
+    return sum + (profile[dim as TradeoffDimension] ?? 0) * (w ?? 0)
+  }, 0)
+}
+
+function calcStars(
+  passed: boolean,
+  capabilityResults: CapabilityResult[],
+  tradeoffScore: number,
+  rubric: Rubric,
+  nodeCount: number,
+  edgeCount: number,
+): 1 | 2 | 3 {
+  if (!passed) return 1
+  const allCapsPassed = capabilityResults.every(r => r.passed)
+  if (!allCapsPassed) return 1
+  const aboveThreshold =
+    rubric.tradeoffThreshold == null ||
+    tradeoffScore >= rubric.tradeoffThreshold
+  const withinBudget =
+    rubric.optimization == null ||
+    (nodeCount <= rubric.optimization.maxNodes &&
+      edgeCount <= rubric.optimization.maxEdges)
+  return aboveThreshold && withinBudget ? 3 : 2
+}
 
 /**
  * Pure, synchronous scoring function.
  * Accepts raw ReactFlow node/edge arrays — no @xyflow/react dependency needed.
- * Requirements are evaluated exclusively via Datalog rules in rubric.datalogRules.
  */
 export function scoreGraph(
   rawNodes: readonly RawNode[],
@@ -28,18 +86,12 @@ export function scoreGraph(
   const nodes = normalizeNodes(rawNodes)
   const edges = normalizeEdges(rawEdges, nodes)
 
-  // 2. Zone inference (mutates node.zone in place)
-  inferZones(nodes, edges)
-
-  // 3. Mark cross-zone edges (mutates edge.crossesZone in place)
-  annotateEdgeCrossings(edges, nodes)
-
-  // 4. Build the annotated graph passed to all detectors
+  // 2. Build the annotated graph passed to all detectors
   const graph: AnnotatedGraph = { nodes, edges, puzzle: puzzleContext }
 
-  // 5. Initialise requirement results from rubric metadata — Datalog is the
-  //    sole authority for setting passed: true.
-  let requirementResults: RequirementResult[] = rubric.requirements.map(req => ({
+  // 3. Initialise hard constraint results from rubric metadata — Datalog is
+  //    the sole authority for setting passed: true.
+  let hardConstraintResults: RequirementResult[] = rubric.hardConstraints.map(req => ({
     id: req.id,
     label: req.label,
     hint: req.hint,
@@ -47,23 +99,42 @@ export function scoreGraph(
     bonus: req.bonus ?? false,
   }))
 
-  // 6. Detect anti-patterns selected by this puzzle's rubric.
-  let violations: Violation[] = (rubric.antiPatterns ?? []).flatMap(ap => ap.detect(graph))
+  // 4. Initialise capability results from rubric metadata.
+  let capabilityResults: CapabilityResult[] = (rubric.capabilityGoals ?? []).map(goal => ({
+    id: goal.id,
+    label: goal.label,
+    hint: goal.hint,
+    passed: false,
+  }))
 
-  // 7. Datalog — the sole mechanism for evaluating requirements.
+  // 5. Evaluate restrictions — each is always surfaced in the panel.
+  const restrictionResults: RestrictionResult[] = (rubric.restrictions ?? []).map(r => ({
+    id: r.id,
+    label: r.label,
+    hint: r.hint,
+    passed: r.detect(graph).length === 0,
+  }))
+
+  // 6. Aggregate tradeoff profile from all placed nodes.
+  const tradeoffProfile = aggregateTradeoffs(nodes)
+
+  // 7. Datalog — evaluates both req() and capgoal() predicates; also yields violations.
+  let violations: Violation[] = []
   if (rubric.datalogRules) {
     const edb = graphToFacts(nodes, edges, puzzleContext.tags)
-    const dlRules = parseProgram(ZONE_SEED_RULES + '\n' + rubric.datalogRules)
+    const dlRules = parseProgram(rubric.datalogRules)
     const dlResult = evaluate(dlRules, edb)
 
-    const mergedRequirements = dlRequirementResults(dlResult)
-    requirementResults = requirementResults.map(existing => {
-      const dl = mergedRequirements.find(r => r.id === existing.id)
+    // Merge req() results into hard constraint results.
+    const mergedReqs = dlRequirementResults(dlResult)
+    hardConstraintResults = hardConstraintResults.map(existing => {
+      const dl = mergedReqs.find(r => r.id === existing.id)
       return dl !== undefined ? { ...existing, passed: dl.passed } : existing
     })
-    mergedRequirements
-      .filter(r => !requirementResults.some(e => e.id === r.id))
-      .forEach(r => requirementResults.push({
+    // Append any Datalog req IDs not in the rubric (backward-compat).
+    mergedReqs
+      .filter(r => !hardConstraintResults.some(e => e.id === r.id))
+      .forEach(r => hardConstraintResults.push({
         id: r.id,
         label: r.id,
         hint: '',
@@ -71,36 +142,41 @@ export function scoreGraph(
         bonus: false,
       }))
 
-    const mergedViolations = dlViolations(dlResult)
-    violations = [
-      ...violations,
-      ...mergedViolations.map(v => ({
-        antipattern: v.id,
-        message: v.nodeId ? `Node ${v.nodeId} violates ${v.id}` : `Anti-pattern: ${v.id}`,
-        nodeIds: v.nodeId ? [v.nodeId] : undefined,
-      })),
-    ]
+    // Merge capgoal() results into capability results.
+    const mergedCaps = dlCapgoalResults(dlResult)
+    capabilityResults = capabilityResults.map(existing => {
+      const dl = mergedCaps.find(r => r.id === existing.id)
+      return dl !== undefined ? { ...existing, passed: dl.passed } : existing
+    })
+
+    violations = dlViolations(dlResult).map(v => ({
+      restriction: v.id,
+      message: v.nodeId ? `Node ${v.nodeId} violates ${v.id}` : `Violation: ${v.id}`,
+      nodeIds: v.nodeId ? [v.nodeId] : undefined,
+    }))
   }
 
-  // 8. Pass when every non-bonus requirement is satisfied and no violations.
-  const coreRequirementsPassed =
-    rubric.requirements.filter(r => !(r.bonus ?? false)).length === 0 ||
-    requirementResults.filter(r => !r.bonus).every(r => r.passed)
-  const passed = coreRequirementsPassed && violations.length === 0
+  // 8. Passed when every non-bonus hard constraint is satisfied, all restrictions
+  //    hold, and there are no violations.
+  const coreConstraintsPassed =
+    rubric.hardConstraints.filter(r => !(r.bonus ?? false)).length === 0 ||
+    hardConstraintResults.filter(r => !r.bonus).every(r => r.passed)
+  const restrictionsAllPass = restrictionResults.every(r => r.passed)
+  const passed = coreConstraintsPassed && restrictionsAllPass && violations.length === 0
 
-  // 9. Perfect tier: passed, all bonuses complete, and within the optimization budget.
-  const bonusRequirementsPassed = requirementResults.filter(r => r.bonus).every(r => r.passed)
-  const perfect =
-    passed &&
-    bonusRequirementsPassed &&
-    rubric.optimization != null &&
-    nodes.length <= rubric.optimization.maxNodes &&
-    edges.length <= rubric.optimization.maxEdges
+  // 9. Star rating.
+  const tradeoffScore = calcTradeoffScore(tradeoffProfile, rubric.tradeoffWeights ?? {})
+  const stars = passed
+    ? calcStars(passed, capabilityResults, tradeoffScore, rubric, nodes.length, edges.length)
+    : 1
 
   return {
     violations,
-    requirementResults,
+    hardConstraintResults,
+    capabilityResults,
+    tradeoffProfile,
+    restrictionResults,
     passed,
-    perfect,
+    stars,
   }
 }
